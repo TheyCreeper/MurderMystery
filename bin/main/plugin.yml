@@ -1,0 +1,12 @@
+name: MurderMystery
+version: 1.0.0
+main: dev.theycreeper.MurderMystery.MurderMystery
+api-version: '26.3'
+description: Simple MurderMystery plugin
+commands:
+  MurderMystery:
+    permission: MurderMystery.commands.MurderMystery
+    description: See a player's inventory
+  ecsee:
+    permission: MurderMystery.commands.ecsee
+    description: Allows you to access a player's enderchest
