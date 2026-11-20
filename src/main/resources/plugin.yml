@@ -4,6 +4,8 @@ main: dev.theycreeper.murdermystery.MurderMystery
 api-version: '26.3'
 description: Simple MurderMystery plugin
 commands:
-  startmm:
-    permission: murdermystery.commands.startmm
+  mmstart:
+    permission: murdermystery.commands.mmstart
     description: Start a murder mystery game
+  mmstop:
+    permission: murdermystery.commands.mmstop

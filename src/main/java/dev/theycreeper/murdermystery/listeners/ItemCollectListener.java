@@ -1,5 +1,6 @@
 package dev.theycreeper.murdermystery.listeners;
 
+import dev.theycreeper.murdermystery.MurderMystery;
 import dev.theycreeper.murdermystery.configs.ConfigHandler;
 import org.bukkit.Material;
 import org.bukkit.entity.Item;
@@ -16,6 +17,7 @@ public class ItemCollectListener implements Listener {
     @EventHandler
     public void onItemCollect(EntityPickupItemEvent event) {
         if (!(event.getEntity() instanceof Player p)) return;
+        if (!MurderMystery.getInstance().getGameManager().isPlayerInGame(p)) return;
         if (event.getItem().getItemStack().getType() == Material.GOLD_INGOT) {
             if (shouldGetBow(p.getInventory())) {
                 event.setCancelled(true);

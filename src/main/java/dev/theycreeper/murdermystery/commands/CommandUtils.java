@@ -1,4 +1,4 @@
-package dev.theycreeper.MurderMystery.commands;
+package dev.theycreeper.murdermystery.commands;
 
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
@@ -34,15 +34,8 @@ public class CommandUtils {
         return Bukkit.getOfflinePlayer(playerName).getPlayer();
     }
 
-    public static ArrayList<String> getAllPlayers() {
-        ArrayList<String> playerNames = new ArrayList<>();
-        for (Player player : Bukkit.getOnlinePlayers()) {
-            playerNames.add(player.getName());
-        }
-        for (OfflinePlayer player : Bukkit.getOfflinePlayers()) {
-            playerNames.add(player.getName());
-        }
-        return playerNames;
+    public static ArrayList<Player> getAllPlayers() {
+        return new ArrayList<>(Bukkit.getOnlinePlayers());
     }
 
     public static Location MakeLocationValid(Location location) {
