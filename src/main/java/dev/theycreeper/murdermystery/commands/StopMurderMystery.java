@@ -1,6 +1,6 @@
 package dev.theycreeper.murdermystery.commands;
 
-import dev.theycreeper.murdermystery.MMGameManager;
+import dev.theycreeper.murdermystery.manager.MMGameManager;
 import dev.theycreeper.murdermystery.MurderMystery;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;

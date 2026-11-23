@@ -1,9 +1,14 @@
 package dev.theycreeper.murdermystery;
 
+import dev.theycreeper.murdermystery.commands.CreateNewMMZone;
 import dev.theycreeper.murdermystery.commands.StartMurderMystery;
 import dev.theycreeper.murdermystery.commands.StopMurderMystery;
 import dev.theycreeper.murdermystery.configs.ConfigHandler;
-import dev.theycreeper.murdermystery.corpse.CorpseManager;
+import dev.theycreeper.murdermystery.listeners.ItemUsedListener;
+import dev.theycreeper.murdermystery.manager.CorpseManager;
+import dev.theycreeper.murdermystery.manager.MMGameManager;
+import dev.theycreeper.murdermystery.manager.ZoneCreationManager;
+import dev.theycreeper.murdermystery.saving.SQLHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -13,27 +18,35 @@ public class MurderMystery extends JavaPlugin implements Listener {
     private static MurderMystery instance;
     private MMGameManager gameManager;
     private CorpseManager corpseManager;
-
+    private ZoneCreationManager zoneCreationManager;
+    private ItemUsedListener itemUsedListener;
     public static MurderMystery getInstance() {
         return instance;
     }
+
     public MMGameManager getGameManager() {
         return gameManager;
     }
+
     public CorpseManager getCorpseManager() {
         return corpseManager;
     }
+    public ZoneCreationManager getZoneCreationManager() { return zoneCreationManager; }
 
     @Override
     public void onEnable() {
         instance = this;
+        itemUsedListener = new ItemUsedListener(zoneCreationManager);
         gameManager = new MMGameManager();
         corpseManager = new CorpseManager(this);
+        zoneCreationManager = new ZoneCreationManager();
+        getServer().getPluginManager().registerEvents(itemUsedListener, this);
         saveDefaultConfig();
         registerCommands();
         handleConfig();
         getServer().getPluginManager().registerEvents(this, this);
         getLogger().info("MurderMystery enabled!");
+        SQLHandler.getInstance().init();
     }
 
     @Override
@@ -45,9 +58,10 @@ public class MurderMystery extends JavaPlugin implements Listener {
     private void registerCommands() {
         Objects.requireNonNull(this.getCommand("mmstart")).setExecutor(new StartMurderMystery());
         Objects.requireNonNull(this.getCommand("mmstop")).setExecutor(new StopMurderMystery());
+        Objects.requireNonNull(this.getCommand("mmnew")).setExecutor(new CreateNewMMZone());
     }
 
-    private void handleConfig(){
+    private void handleConfig() {
         saveDefaultConfig();
         getConfig().options().copyDefaults(true);
         saveConfig();

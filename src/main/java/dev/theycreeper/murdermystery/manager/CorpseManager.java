@@ -1,6 +1,7 @@
 
-package dev.theycreeper.murdermystery.corpse;
+package dev.theycreeper.murdermystery.manager;
 
+import dev.theycreeper.murdermystery.corpse.FakePlayer;
 import org.bukkit.Bukkit;
 import org.bukkit.Chunk;
 import org.bukkit.Location;

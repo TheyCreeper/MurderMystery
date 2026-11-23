@@ -3,6 +3,7 @@ package dev.theycreeper.murdermystery.game;
 import dev.theycreeper.murdermystery.MurderMystery;
 import dev.theycreeper.murdermystery.listeners.ItemCollectListener;
 import dev.theycreeper.murdermystery.listeners.PlayerKillListener;
+import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.event.HandlerList;
 import org.bukkit.event.Listener;
@@ -73,6 +74,9 @@ public class MurderMysteryGame {
     }
 
     public void EndGame() {
+        for (MMPlayer mmPlayer : playerList) {
+            revivePlayer(mmPlayer.getPlayer());
+        }
         eventListeners.forEach(HandlerList::unregisterAll);
         corpses.forEach(MurderMystery.getInstance().getCorpseManager()::remove);
         corpses.clear();
@@ -81,23 +85,20 @@ public class MurderMysteryGame {
         playersLeft = 0;
         murdererKills = 0;
 
-        for (MMPlayer mmPlayer : playerList) {
-            revivePlayer(mmPlayer.getPlayer());
-        }
     }
 
     public void revivePlayer(Player player) {
-
-        player.setInvisible(false);
         player.setFlying(false);
         player.setAllowFlight(false);
 
-        player.setCollidable(true);
         player.setCollidable(true);
 
         player.showPlayer(MurderMystery.getInstance(), player);
         player.setHealth(20.0);
         player.setFoodLevel(20);
         player.setFireTicks(0);
+        for (Player online : Bukkit.getOnlinePlayers()) {
+            online.showPlayer(MurderMystery.getInstance(), player);
+        }
     }
 }

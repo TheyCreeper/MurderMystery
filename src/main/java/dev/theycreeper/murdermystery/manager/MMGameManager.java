@@ -1,11 +1,10 @@
-package dev.theycreeper.murdermystery;
+package dev.theycreeper.murdermystery.manager;
 
 import dev.theycreeper.murdermystery.game.MurderMysteryGame;
 import org.bukkit.entity.Player;
 import org.bukkit.event.Listener;
 
 import java.util.ArrayList;
-import java.util.UUID;
 
 public class MMGameManager implements Listener {
     ArrayList<MurderMysteryGame> activeGames = new ArrayList<>();

@@ -60,7 +60,9 @@ public class PlayerKillListener implements Listener {
 
         // 3. No collision (players/mobs won't push them, arrows/items pass through)
         player.setCollidable(false);
-        player.hidePlayer(MurderMystery.getInstance(), player);
+        for (Player online : Bukkit.getOnlinePlayers()) {
+            online.hidePlayer(MurderMystery.getInstance(), player);
+        }
     }
 
     private boolean isValidWeapon(EntityDamageByEntityEvent event) {

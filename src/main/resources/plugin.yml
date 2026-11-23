@@ -9,3 +9,6 @@ commands:
     description: Start a murder mystery game
   mmstop:
     permission: murdermystery.commands.mmstop
+  mmnew:
+    permission: murdermystery.commands.mmnew
+    description: Create a new murder mystery map
