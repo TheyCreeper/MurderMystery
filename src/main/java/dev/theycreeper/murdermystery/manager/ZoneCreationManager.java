@@ -36,6 +36,7 @@ public class ZoneCreationManager {
             }
             case Material.RED_WOOL -> saveZone(e.getPlayer());
         }
+        e.setCancelled(true);
     }
 
     public void handleAreaSelectionMenuClick(PlayerInteractEvent e) {
