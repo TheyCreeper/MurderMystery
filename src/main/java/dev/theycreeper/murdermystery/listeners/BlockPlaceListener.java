@@ -15,13 +15,15 @@ public class BlockPlaceListener implements Listener {
                 && e.getBlock().getBlockData().getMaterial() != Material.BARRIER &&
                 MurderMystery.getInstance().getZoneCreationManager().getPlayerState(e.getPlayer().getUniqueId()) != CurrentPlayerMenu.offLimitZoneEdit) {
             e.setCancelled(true);
+            MurderMystery.getInstance().getZoneCreationManager().addOffLimitBlock(e.getBlock().getLocation());
         }
     }
     @EventHandler
-    private void onBlockPlaced(BlockBreakEvent e) {
+    private void onBlockBreak(BlockBreakEvent e) {
         if (MurderMystery.getInstance().getZoneCreationManager().isPlayerEditing(e.getPlayer().getUniqueId())
                 && e.getBlock().getBlockData().getMaterial() != Material.BARRIER) {
             e.setCancelled(true);
+            MurderMystery.getInstance().getZoneCreationManager().remOffLimitBlock(e.getBlock().getLocation());
         }
     }
 }

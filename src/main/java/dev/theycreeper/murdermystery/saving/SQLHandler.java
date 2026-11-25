@@ -43,6 +43,9 @@ public class SQLHandler {
                         FOREIGN KEY("uuid") REFERENCES "player"("uuid")
                     )""");
             statement.execute("""
+                    CREATE TABLE IF NOT EXISTS ""
+                    """);
+            statement.execute("""
                     CREATE INDEX IF NOT EXISTS "idx_items_owner_type"
                     ON "inventory_item" ("uuid")""");
         } catch (SQLException e) {

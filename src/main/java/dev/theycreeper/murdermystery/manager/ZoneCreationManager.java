@@ -32,9 +32,11 @@ public class ZoneCreationManager {
             case Material.GOLD_INGOT -> setPlayerMenu(e.getPlayer(), CurrentPlayerMenu.goldZoneEdit);
             case Material.BARRIER -> setPlayerMenu(e.getPlayer(), CurrentPlayerMenu.offLimitZoneEdit);
             case Material.GREEN_WOOL -> {
-                // Ig confirm some stuff or modify the outline of the zone
+                saveZone(e.getPlayer());
             }
-            case Material.RED_WOOL -> saveZone(e.getPlayer());
+            case Material.RED_WOOL -> {
+                // do something to remove everything ig
+            }
         }
         e.setCancelled(true);
     }
@@ -165,6 +167,12 @@ public class ZoneCreationManager {
                 .forEach(Entity::remove);
     }
 
+    public void addOffLimitBlock(Location loc) {
+        zone.addOffLimits(loc);
+    }
+    public void remOffLimitBlock(Location loc) {
+        zone.remOffLimits(loc);
+    }
     public void setZoneCreationMode(Player player, String mapName) {
         // sets the inventory to set the zone
         zone.setMapName(mapName);
@@ -177,7 +185,7 @@ public class ZoneCreationManager {
         removeDisplays();
         PlayerStateChanger.normalMode(p, previousUserGamemode);
         // do something here
-//        blockHighlight = BlockDisplayHelper.createDisplayHighlight(zone.getCorner1(), zone.getCorner2(), Color.AQUA, "zone");
+        s
     }
 
     // Sets the player mode in the map & sets the correct menu inventory
