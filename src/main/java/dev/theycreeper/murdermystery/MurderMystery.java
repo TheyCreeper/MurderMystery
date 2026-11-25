@@ -4,11 +4,13 @@ import dev.theycreeper.murdermystery.commands.CreateNewMMZone;
 import dev.theycreeper.murdermystery.commands.StartMurderMystery;
 import dev.theycreeper.murdermystery.commands.StopMurderMystery;
 import dev.theycreeper.murdermystery.configs.ConfigHandler;
+import dev.theycreeper.murdermystery.listeners.BlockPlaceListener;
 import dev.theycreeper.murdermystery.listeners.ItemUsedListener;
 import dev.theycreeper.murdermystery.manager.CorpseManager;
 import dev.theycreeper.murdermystery.manager.MMGameManager;
 import dev.theycreeper.murdermystery.manager.ZoneCreationManager;
 import dev.theycreeper.murdermystery.saving.SQLHandler;
+import org.bukkit.block.Block;
 import org.bukkit.event.Listener;
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -20,6 +22,7 @@ public class MurderMystery extends JavaPlugin implements Listener {
     private CorpseManager corpseManager;
     private ZoneCreationManager zoneCreationManager;
     private ItemUsedListener itemUsedListener;
+    private BlockPlaceListener blockPlaceListener;
     public static MurderMystery getInstance() {
         return instance;
     }
@@ -37,10 +40,12 @@ public class MurderMystery extends JavaPlugin implements Listener {
     public void onEnable() {
         instance = this;
         itemUsedListener = new ItemUsedListener(zoneCreationManager);
+        blockPlaceListener = new BlockPlaceListener();
         gameManager = new MMGameManager();
         corpseManager = new CorpseManager(this);
         zoneCreationManager = new ZoneCreationManager();
         getServer().getPluginManager().registerEvents(itemUsedListener, this);
+        getServer().getPluginManager().registerEvents(blockPlaceListener, this);
         saveDefaultConfig();
         registerCommands();
         handleConfig();

@@ -1,5 +1,6 @@
 package dev.theycreeper.murdermystery.manager;
 
+import net.kyori.adventure.text.Component;
 import org.bukkit.Color;
 import org.bukkit.Location;
 import org.bukkit.Material;
@@ -15,7 +16,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class BlockDisplayHelper {
-    public static List<BlockDisplay> createDisplayHighlight(Location corner1, Location corner2, Color borderColor) {
+    public static List<BlockDisplay> createDisplayHighlight(Location corner1, Location corner2, Color borderColor, String typeName, Boolean shouldDisplayCorners) {
         List<BlockDisplay> displays = new ArrayList<>(36);
 
         World world1 = (corner1 != null) ? corner1.getWorld() : null;
@@ -31,38 +32,38 @@ public class BlockDisplayHelper {
             double maxZ = Math.max(corner1.getBlockZ(), corner2.getBlockZ()) + 1.0;
 
             displays.addAll(buildBoxEdges(
-                    world1, minX, minY, minZ, maxX, maxY, maxZ, 0.02f, borderColor
+                    world1, minX, minY, minZ, maxX, maxY, maxZ, 0.02f, borderColor, typeName
             ));
         }
+        if (shouldDisplayCorners) {
+            // 2. Draw Corner 1 wireframe (Red) snapped to full block grid
+            if (world1 != null) {
+                int c1X = corner1.getBlockX();
+                int c1Y = corner1.getBlockY();
+                int c1Z = corner1.getBlockZ();
 
-        // 2. Draw Corner 1 wireframe (Red) snapped to full block grid
-        if (world1 != null) {
-            int c1X = corner1.getBlockX();
-            int c1Y = corner1.getBlockY();
-            int c1Z = corner1.getBlockZ();
+                displays.addAll(buildBoxEdges(
+                        world1,
+                        c1X - 0.005, c1Y - 0.005, c1Z - 0.005,
+                        c1X + 1.005, c1Y + 1.005, c1Z + 1.005,
+                        0.025f, Color.RED, typeName
+                ));
+            }
 
-            displays.addAll(buildBoxEdges(
-                    world1,
-                    c1X - 0.005, c1Y - 0.005, c1Z - 0.005,
-                    c1X + 1.005, c1Y + 1.005, c1Z + 1.005,
-                    0.025f, Color.RED
-            ));
+            // 3. Draw Corner 2 wireframe (Lime) snapped to full block grid (skip if same block as Corner 1)
+            if (world2 != null && !isSameBlock(corner1, corner2)) {
+                int c2X = corner2.getBlockX();
+                int c2Y = corner2.getBlockY();
+                int c2Z = corner2.getBlockZ();
+
+                displays.addAll(buildBoxEdges(
+                        world2,
+                        c2X - 0.005, c2Y - 0.005, c2Z - 0.005,
+                        c2X + 1.005, c2Y + 1.005, c2Z + 1.005,
+                        0.025f, Color.LIME, typeName
+                ));
+            }
         }
-
-        // 3. Draw Corner 2 wireframe (Lime) snapped to full block grid (skip if same block as Corner 1)
-        if (world2 != null && !isSameBlock(corner1, corner2)) {
-            int c2X = corner2.getBlockX();
-            int c2Y = corner2.getBlockY();
-            int c2Z = corner2.getBlockZ();
-
-            displays.addAll(buildBoxEdges(
-                    world2,
-                    c2X - 0.005, c2Y - 0.005, c2Z - 0.005,
-                    c2X + 1.005, c2Y + 1.005, c2Z + 1.005,
-                    0.025f, Color.LIME
-            ));
-        }
-
         return displays;
     }
 
@@ -75,8 +76,8 @@ public class BlockDisplayHelper {
     }
 
     private static List<BlockDisplay> buildBoxEdges(World world, double minX, double minY, double minZ,
-                                             double maxX, double maxY, double maxZ,
-                                             float thickness, Color glowColor) {
+                                                    double maxX, double maxY, double maxZ,
+                                                    float thickness, Color glowColor, String typeName) {
         float sizeX = (float) (maxX - minX);
         float sizeY = (float) (maxY - minY);
         float sizeZ = (float) (maxZ - minZ);
@@ -85,28 +86,28 @@ public class BlockDisplayHelper {
         List<BlockDisplay> edges = new ArrayList<>(12);
 
         // 4 X-axis edges
-        edges.add(spawnEdge(world, minX, minY - halfT, minZ - halfT, sizeX, thickness, thickness, glowColor));
-        edges.add(spawnEdge(world, minX, minY - halfT, maxZ - halfT, sizeX, thickness, thickness, glowColor));
-        edges.add(spawnEdge(world, minX, maxY - halfT, minZ - halfT, sizeX, thickness, thickness, glowColor));
-        edges.add(spawnEdge(world, minX, maxY - halfT, maxZ - halfT, sizeX, thickness, thickness, glowColor));
+        edges.add(spawnEdge(world, minX, minY - halfT, minZ - halfT, sizeX, thickness, thickness, glowColor, typeName));
+        edges.add(spawnEdge(world, minX, minY - halfT, maxZ - halfT, sizeX, thickness, thickness, glowColor, typeName));
+        edges.add(spawnEdge(world, minX, maxY - halfT, minZ - halfT, sizeX, thickness, thickness, glowColor, typeName));
+        edges.add(spawnEdge(world, minX, maxY - halfT, maxZ - halfT, sizeX, thickness, thickness, glowColor, typeName));
 
         // 4 Z-axis edges
-        edges.add(spawnEdge(world, minX - halfT, minY - halfT, minZ, thickness, thickness, sizeZ, glowColor));
-        edges.add(spawnEdge(world, maxX - halfT, minY - halfT, minZ, thickness, thickness, sizeZ, glowColor));
-        edges.add(spawnEdge(world, minX - halfT, maxY - halfT, minZ, thickness, thickness, sizeZ, glowColor));
-        edges.add(spawnEdge(world, maxX - halfT, maxY - halfT, minZ, thickness, thickness, sizeZ, glowColor));
+        edges.add(spawnEdge(world, minX - halfT, minY - halfT, minZ, thickness, thickness, sizeZ, glowColor, typeName));
+        edges.add(spawnEdge(world, maxX - halfT, minY - halfT, minZ, thickness, thickness, sizeZ, glowColor, typeName));
+        edges.add(spawnEdge(world, minX - halfT, maxY - halfT, minZ, thickness, thickness, sizeZ, glowColor, typeName));
+        edges.add(spawnEdge(world, maxX - halfT, maxY - halfT, minZ, thickness, thickness, sizeZ, glowColor, typeName));
 
         // 4 Y-axis edges
-        edges.add(spawnEdge(world, minX - halfT, minY, minZ - halfT, thickness, sizeY, thickness, glowColor));
-        edges.add(spawnEdge(world, maxX - halfT, minY, minZ - halfT, thickness, sizeY, thickness, glowColor));
-        edges.add(spawnEdge(world, minX - halfT, minY, maxZ - halfT, thickness, sizeY, thickness, glowColor));
-        edges.add(spawnEdge(world, maxX - halfT, minY, maxZ - halfT, thickness, sizeY, thickness, glowColor));
+        edges.add(spawnEdge(world, minX - halfT, minY, minZ - halfT, thickness, sizeY, thickness, glowColor, typeName));
+        edges.add(spawnEdge(world, maxX - halfT, minY, minZ - halfT, thickness, sizeY, thickness, glowColor, typeName));
+        edges.add(spawnEdge(world, minX - halfT, minY, maxZ - halfT, thickness, sizeY, thickness, glowColor, typeName));
+        edges.add(spawnEdge(world, maxX - halfT, minY, maxZ - halfT, thickness, sizeY, thickness, glowColor, typeName));
 
         return edges;
     }
 
     private static BlockDisplay spawnEdge(World world, double x, double y, double z,
-                                   float scaleX, float scaleY, float scaleZ, Color glowColor) {
+                                          float scaleX, float scaleY, float scaleZ, Color glowColor, String typeName) {
         Location loc = new Location(world, x, y, z);
         BlockDisplay display = (BlockDisplay) world.spawnEntity(loc, EntityType.BLOCK_DISPLAY);
 
@@ -115,6 +116,7 @@ public class BlockDisplayHelper {
         display.setGlowColorOverride(glowColor);
         display.setPersistent(false);
         display.setBrightness(new Display.Brightness(15, 15));
+        display.customName(Component.text(typeName));
 
         display.setTransformation(new Transformation(
                 new Vector3f(0, 0, 0),

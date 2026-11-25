@@ -12,7 +12,8 @@ import org.bukkit.inventory.PlayerInventory;
 import org.bukkit.inventory.meta.ItemMeta;
 
 public class PlayerStateChanger {
-    public static void normalMode(Player player) {
+    public static void normalMode(Player player, GameMode mode) {
+        player.setGameMode(mode);
         player.getInventory().clear();
         Inventory backedInv = SQLHandler.getInstance().getStoredInventory(player.getUniqueId());
         PlayerInventory inv = player.getInventory();
@@ -36,16 +37,12 @@ public class PlayerStateChanger {
         player.setFireTicks(0);
     }
 
-    public static void editingMode(Player p) {
+    public static GameMode editingMode(Player p) {
         SQLHandler.getInstance().storeInventory(p);
         p.getInventory().clear();
-        p.setHealth(20.0);
-        p.setFoodLevel(20);
-        p.setFireTicks(0);
-        p.setGameMode(GameMode.ADVENTURE);
-        p.setAllowFlight(true);
-        p.setFlying(true);
-        p.setCollidable(false);
+        GameMode temp = p.getGameMode();
+        p.setGameMode(GameMode.CREATIVE);
+        return temp;
     }
 
     public static void PushMainMenu(Player p) {
@@ -69,6 +66,9 @@ public class PlayerStateChanger {
 
     public static void PushGoldAreaMenu(Player p) {
         PushSingleMenuItem(p, Material.GOLD_INGOT, "Gold spawning areas");
+        Inventory inv = p.getInventory();
+        inv.setItem(1, getCustomItemName(Material.GREEN_DYE, "Add another zone"));
+        inv.setItem(2, getCustomItemName(Material.RED_CUSHION, "Remove a zone"));
     }
 
     public static void PushSelectionMenu(Player p) {
