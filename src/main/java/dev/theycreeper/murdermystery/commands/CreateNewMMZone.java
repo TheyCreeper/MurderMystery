@@ -12,6 +12,10 @@ public class CreateNewMMZone implements CommandExecutor {
     @Override
     public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command, @NotNull String label, @NotNull String @NotNull [] args) {
         if (!(sender instanceof Player p)) return false;
+        if (MurderMystery.getInstance().getGameManager().hasActiveGame()) {
+            sender.sendMessage("Finish the current game before editing a map.");
+            return true;
+        }
         String name = CommandUtils.getSanitizedArgsList(args).getFirst();
         MurderMystery.getInstance().getZoneCreationManager().setZoneCreationMode(p, name);
         return false;

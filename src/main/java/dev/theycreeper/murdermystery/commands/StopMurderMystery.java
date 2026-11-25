@@ -13,8 +13,12 @@ public class StopMurderMystery implements CommandExecutor {
     public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command, @NotNull String label, @NotNull String @NotNull [] args) {
         if (!(sender instanceof Player p)) return false;
         MMGameManager gameManager = MurderMystery.getInstance().getGameManager();
+        if (!gameManager.hasActiveGame()) {
+            sender.sendMessage("No game is running.");
+            return true;
+        }
         gameManager.StopGame();
         sender.sendRichMessage("Stopped the game");
-        return false;
+        return true;
     }
 }

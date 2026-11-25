@@ -3,7 +3,9 @@ package dev.theycreeper.murdermystery.manager;
 import dev.theycreeper.murdermystery.game.MurderMysteryZone;
 import dev.theycreeper.murdermystery.game.PlayerState;
 import dev.theycreeper.murdermystery.model.Pair;
+import dev.theycreeper.murdermystery.saving.SQLHandler;
 import org.bukkit.*;
+import org.bukkit.block.Block;
 import org.bukkit.entity.*;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.player.PlayerInteractEvent;
@@ -17,12 +19,14 @@ public class ZoneCreationManager {
     private List<BlockDisplay> blockHighlight;
     private Map<UUID, CurrentPlayerMenu> playerMode = new HashMap<>();
     private Location tempGoldCorner1, tempGoldCorner2;
+    private final Map<String, List<BlockDisplay>> obstructedDisplays = new HashMap<>();
 
     public void handleClickEvent(PlayerInteractEvent e) {
         switch (playerMode.get(e.getPlayer().getUniqueId())) {
             case CurrentPlayerMenu.mainMenu -> handleMainMenuClick(e);
             case CurrentPlayerMenu.goldZoneEdit -> handleGoldAreaClick(e);
             case CurrentPlayerMenu.zoneEdit -> handleAreaSelectionMenuClick(e);
+            case CurrentPlayerMenu.offLimitZoneEdit -> handleBarrierClick(e);
         }
     }
 
@@ -88,17 +92,12 @@ public class ZoneCreationManager {
 
     public void handleBarrierClick(PlayerInteractEvent e) {
         switch (e.getItem().getType()) {
-            case Material.STICK -> {
-                if (e.getClickedBlock() == null && e.getAction() == Action.LEFT_CLICK_AIR || e.getAction() == Action.RIGHT_CLICK_AIR) {
-                    changeCornerZone(e.getPlayer().getLocation(), e.getAction());
-                } else {
-                    changeCornerZone(e.getClickedBlock().getLocation(), e.getAction());
-                }
-            }
             case Material.GREEN_WOOL -> {
-                // Ig confirm some stuff or modify the outline of the zone
+                setPlayerMenu(e.getPlayer(), CurrentPlayerMenu.mainMenu);
             }
-            case Material.RED_WOOL -> setPlayerMenu(e.getPlayer(), CurrentPlayerMenu.mainMenu);
+            case Material.RED_WOOL -> {
+                // ig remove the ones that the user just placed or smt
+            }
         }
     }
 
@@ -156,7 +155,9 @@ public class ZoneCreationManager {
     }
 
     public void removeDisplays() {
-        zone.getCorner1().getWorld().getEntitiesByClass(BlockDisplay.class).forEach(Entity::remove);
+        removeDisplays("zone");
+        removeDisplays("goldZone");
+        removeDisplays("goldZoneTemp");
     }
 
     public void removeDisplays(String name) {
@@ -182,10 +183,21 @@ public class ZoneCreationManager {
     }
 
     public void saveZone(Player p) {
+        try {
+            SQLHandler.getInstance().storeZone(zone);
+        } catch (IllegalArgumentException | IllegalStateException e) {
+            p.sendMessage("Could not save map: " + e.getMessage());
+            return;
+        }
+        unloadMap(zone);
         removeDisplays();
         PlayerStateChanger.normalMode(p, previousUserGamemode);
-        // do something here
-        s
+        edittingPlayers.remove(p.getUniqueId());
+        playerMode.remove(p.getUniqueId());
+        zone = new MurderMysteryZone();
+        tempGoldCorner1 = null;
+        tempGoldCorner2 = null;
+        p.sendMessage("Map saved.");
     }
 
     // Sets the player mode in the map & sets the correct menu inventory
@@ -213,5 +225,63 @@ public class ZoneCreationManager {
 
     public boolean isPlayerEditing(UUID uuid) {
         return edittingPlayers.contains(uuid);
+    }
+
+    public boolean loadMap(MurderMysteryZone map) {
+        clearObstructionHighlights(map.getMapName());
+        List<Location> obstructions = new ArrayList<>();
+        for (Location location : map.getOffLimits()) {
+            Block block = location.getBlock();
+            if (!block.isEmpty() && block.getType() != Material.BARRIER) {
+                obstructions.add(location);
+            }
+        }
+        if (!obstructions.isEmpty()) {
+            List<BlockDisplay> displays = new ArrayList<>();
+            obstructedDisplays.put(map.getMapName(), displays);
+            for (Location location : obstructions) {
+                displays.addAll(BlockDisplayHelper.createDisplayHighlight(
+                        location, location, Color.RED, "mapObstruction", false));
+            }
+            return false;
+        }
+        List<Block> placed = new ArrayList<>();
+        try {
+            for (Location location : map.getOffLimits()) {
+                Block block = location.getBlock();
+                if (block.isEmpty()) {
+                    block.setType(Material.BARRIER, false);
+                    placed.add(block);
+                }
+            }
+        } catch (RuntimeException e) {
+            for (Block block : placed) {
+                try {
+                    if (block.getType() == Material.BARRIER) block.setType(Material.AIR, false);
+                } catch (RuntimeException cleanupError) {
+                    e.addSuppressed(cleanupError);
+                }
+            }
+            throw e;
+        }
+        return true;
+    }
+
+    public void unloadMap(MurderMysteryZone map) {
+        clearObstructionHighlights(map.getMapName());
+        for (Location location : map.getOffLimits()) {
+            Block block = location.getBlock();
+            if (block.getType() == Material.BARRIER) block.setType(Material.AIR, false);
+        }
+    }
+
+    public void clearObstructionHighlights() {
+        obstructedDisplays.values().forEach(displays -> displays.forEach(Entity::remove));
+        obstructedDisplays.clear();
+    }
+
+    private void clearObstructionHighlights(String mapName) {
+        List<BlockDisplay> displays = obstructedDisplays.remove(mapName);
+        if (displays != null) displays.forEach(Entity::remove);
     }
 }

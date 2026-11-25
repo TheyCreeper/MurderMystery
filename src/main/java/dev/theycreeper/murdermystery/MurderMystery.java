@@ -56,6 +56,8 @@ public class MurderMystery extends JavaPlugin implements Listener {
 
     @Override
     public void onDisable() {
+        if (gameManager != null && gameManager.hasActiveGame()) gameManager.StopGame();
+        if (zoneCreationManager != null) zoneCreationManager.clearObstructionHighlights();
         corpseManager.removeAll();
     }
 
