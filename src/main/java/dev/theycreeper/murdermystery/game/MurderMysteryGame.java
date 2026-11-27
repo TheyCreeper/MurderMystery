@@ -4,16 +4,15 @@ import dev.theycreeper.murdermystery.MurderMystery;
 import dev.theycreeper.murdermystery.listeners.DetectiveArrowListener;
 import dev.theycreeper.murdermystery.listeners.ItemCollectListener;
 import dev.theycreeper.murdermystery.listeners.PlayerKillListener;
-import dev.theycreeper.murdermystery.manager.GoldPeriodicSpawn;
 import dev.theycreeper.murdermystery.manager.PlayerStateChanger;
 import dev.theycreeper.murdermystery.model.MMTimer;
+import dev.theycreeper.murdermystery.model.Pair;
 import dev.theycreeper.murdermystery.saving.SQLHandler;
 import org.bukkit.*;
 import org.bukkit.entity.Display;
 import org.bukkit.entity.Item;
 import org.bukkit.entity.ItemDisplay;
 import org.bukkit.entity.Player;
-import org.bukkit.event.EventHandler;
 import org.bukkit.event.HandlerList;
 import org.bukkit.event.Listener;
 import org.bukkit.inventory.ItemStack;
@@ -23,7 +22,6 @@ import org.bukkit.util.Transformation;
 import org.joml.AxisAngle4f;
 import org.joml.Vector3f;
 
-import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -31,26 +29,25 @@ import java.util.Set;
 import java.util.UUID;
 
 public class MurderMysteryGame implements Listener {
-    private BukkitRunnable ticker;
+    private BukkitRunnable ticker, goldSpawner;
     List<MMPlayer> playerList = new ArrayList<MMPlayer>();
-    int playersLeft, murdererKills;
+    int playersLeft, murdererKills, goldTickCounter;
     MMTimer mmTimer;
     int minutesLeft, secondsLeft;
     private List<Listener> eventListeners = new ArrayList<Listener>();
     private final List<UUID> corpses = new ArrayList<>();
     private final Set<UUID> preparedPlayers = new HashSet<>();
-    private GoldPeriodicSpawn goldSpawn;
     private int currentGoldAmount;
     private MurderMysteryZone zone;
     private ItemDisplay droppedBow;
     private final DetectiveArrowListener detectiveArrowListener = new DetectiveArrowListener(this);
+    private ArrayList<Item> goldItem = new ArrayList<>();
 
     public MurderMysteryGame(MurderMysteryZone zone) {
-        eventListeners.add(new ItemCollectListener());
+        eventListeners.add(new ItemCollectListener(this));
         eventListeners.add(new PlayerKillListener(this));
         eventListeners.add(detectiveArrowListener);
         this.zone = zone;
-        goldSpawn = new GoldPeriodicSpawn();
     }
 
     /* Get/Set methods and general utils stuff. Not actual game logic */
@@ -117,8 +114,15 @@ public class MurderMysteryGame implements Listener {
         preparedPlayers.add(player.getUniqueId());
     }
 
-    public void removeQueuePlayer(Player player) {
-        playerList.remove(getMmPlayer(player));
+    public void removePlayer(Player player) {
+        MMPlayer mmPlayer = getMmPlayer(player);
+        if (mmPlayer.getPlayerType() == PlayerType.detective) {
+            createDetectiveBow(player.getLocation());
+        } else if (mmPlayer.getPlayerType() == PlayerType.murderer) {
+            MurderMystery.getInstance().getGameManager().innocentsWin(this);
+        } else  {
+            playerList.remove(getMmPlayer(player));
+        }
     }
 
     public MMPlayer getMmPlayer(Player player) {
@@ -128,6 +132,7 @@ public class MurderMysteryGame implements Listener {
     public PlayerType getPlayerType(Player p) {
         return getMmPlayer(p).getPlayerType();
     }
+
     public PlayerState getPlayerState(Player p) {
         return getMmPlayer(p).getPlayerState();
     }
@@ -145,8 +150,10 @@ public class MurderMysteryGame implements Listener {
     }
 
     public void removeDetectiveBow() {
-        droppedBow.remove();
-        droppedBow = null;
+        if (droppedBow != null) {
+            droppedBow.remove();
+            droppedBow = null;
+        }
     }
 
     public void giveBowIfLocValid(Player p) {
@@ -156,7 +163,9 @@ public class MurderMysteryGame implements Listener {
 
         Location bowLoc = droppedBow.getLocation();
 
-        if (Math.abs(p.getLocation().getY() - bowLoc.getY()) <= 5) {
+        if (Math.abs(p.getLocation().getY() - bowLoc.getY()) <= 5 &&
+                Math.abs(p.getLocation().getX() - bowLoc.getX()) <= 1 &&
+                Math.abs(p.getLocation().getZ() - bowLoc.getZ()) <= 1) {
             setDetective(p, false);
             removeDetectiveBow();
         }
@@ -183,10 +192,41 @@ public class MurderMysteryGame implements Listener {
     }
 
 
+    public boolean isInnocentsLeft() {
+        for (MMPlayer mmPlayer : playerList) {
+            if (mmPlayer.getPlayerType() != PlayerType.murderer && mmPlayer.getPlayerState() == PlayerState.alive)
+                return true;
+        }
+        return false;
+    }
+
+    public void innocentsWin() {
+        for (var player : playerList) {
+            if (player.getPlayerType() != PlayerType.murderer) {
+                player.getPlayer().sendTitle(ChatColor.GREEN + "You win!",
+                        ChatColor.GRAY + "The murderer was stopped", 10, 70, 20);
+            } else {
+                player.getPlayer().sendTitle(ChatColor.RED + "You lost!",
+                        ChatColor.GRAY + "You were killed by a player", 10, 70, 20);
+            }
+        }
+    }
+
+    public void murdererWin() {
+        for (var player : playerList) {
+            if (player.getPlayerType() != PlayerType.murderer) {
+                player.getPlayer().sendTitle(ChatColor.RED + "You Lost!",
+                        ChatColor.GRAY + "The murderer killed everyone", 10, 70, 20);
+            } else {
+                player.getPlayer().sendTitle(ChatColor.GREEN + "You win!",
+                        ChatColor.GRAY + "You killed everyone", 10, 70, 20);
+            }
+        }
+    }
+
     public void StartGame() {
         var pluginManager = MurderMystery.getInstance().getServer().getPluginManager();
         eventListeners.forEach(listener -> pluginManager.registerEvents(listener, MurderMystery.getInstance()));
-        goldSpawn.startGoldSpawning(zone);
         mmTimer = new MMTimer(4, 30);
         startTicker();
     }
@@ -220,8 +260,8 @@ public class MurderMysteryGame implements Listener {
         preparedPlayers.clear();
         playersLeft = 0;
         stopTicker();
+        removeDetectiveBow();
         murdererKills = 0;
-        goldSpawn.stopSpawner();
         if (failure != null) throw failure;
     }
 
@@ -248,9 +288,12 @@ public class MurderMysteryGame implements Listener {
             public void run() {
                 // Tick the timer
                 mmTimer.tick();
+                // Tick the scoreboards
                 for (MMPlayer mmPlayer : playerList) {
                     setScoreboard(mmPlayer, playersLeft, mmTimer.toString(), "Alive", zone.getMapName());
                 }
+                // Tick the gold
+                tickGold();
             }
         };
 
@@ -279,9 +322,14 @@ public class MurderMysteryGame implements Listener {
         );
         objective.setDisplaySlot(DisplaySlot.SIDEBAR);
 
-        Score roleLine = objective.getScore(ChatColor.YELLOW + "Role:  " + ChatColor.GREEN + p.getPlayerType().toString());
+        String state;
+        if (p.getPlayerState() == PlayerState.alive) {
+            state = p.getPlayerType().toString();
+        } else {
+            state = p.getPlayerState().toString();
+        }
+        Score roleLine = objective.getScore(ChatColor.YELLOW + "Role:  " + ChatColor.GREEN + state);
         roleLine.setScore(2);
-
         Score innocentsLeft = objective.getScore(ChatColor.YELLOW + "Innocents left: " + ChatColor.GREEN + playerLeft);
         innocentsLeft.setScore(1);
         Score timeLeftLine = objective.getScore(ChatColor.YELLOW + "Time left: " + ChatColor.GREEN + timeLeft);
@@ -339,6 +387,72 @@ public class MurderMysteryGame implements Listener {
                 },
                 0L,
                 1L
+        );
+    }
+
+    public void removeGoldFromDropped(Item item) {
+        if (goldItem.contains(item)) goldItem.remove(item);
+    }
+
+    private void tickGold() {
+        if (++goldTickCounter < 6) return;
+        goldTickCounter = 0;
+
+        goldItem.removeIf(item -> !item.isValid());
+        int goldOnGround = goldItem.stream()
+                .mapToInt(item -> item.getItemStack().getAmount())
+                .sum();
+        int limit = Math.min(10, playerList.size() * 2);
+
+        if (goldOnGround < limit) {
+            spawnAGold();
+        }
+    }
+
+    public void spawnAGold() {
+        Location spawnLoc = getRandomValidLocation(zone.getAllGoldLoc());
+        World world = spawnLoc.getWorld();
+
+        if (world == null) {
+            return;
+        }
+
+        ItemStack itemStack = new ItemStack(Material.GOLD_INGOT, 1);
+
+        Item droppedItem = world.dropItemNaturally(
+                spawnLoc,
+                itemStack
+        );
+
+        droppedItem.setPickupDelay(20);
+        goldItem.add(droppedItem);
+    }
+
+    private Location getRandomValidLocation(List<Pair<Location, Location>> locations) {
+        int locationIndex = (int) (Math.random() * locations.size());
+
+        Pair<Location, Location> pair = locations.get(locationIndex);
+
+        Location corner1 = pair.getFirst();
+        Location corner2 = pair.getSecond();
+
+        double minX = Math.min(corner1.getX(), corner2.getX());
+        double maxX = Math.max(corner1.getX(), corner2.getX());
+
+        double minY = Math.min(corner1.getY(), corner2.getY());
+        double maxY = Math.max(corner1.getY(), corner2.getY());
+
+        double minZ = Math.min(corner1.getZ(), corner2.getZ());
+        double maxZ = Math.max(corner1.getZ(), corner2.getZ());
+
+        double x = minX + Math.random() * (maxX - minX);
+        double z = minZ + Math.random() * (maxZ - minZ);
+
+        return new Location(
+                corner1.getWorld(),
+                x,
+                corner1.getY() + 1,
+                z
         );
     }
 }

@@ -2,6 +2,7 @@ package dev.theycreeper.murdermystery.listeners;
 
 import dev.theycreeper.murdermystery.MurderMystery;
 import dev.theycreeper.murdermystery.configs.ConfigHandler;
+import dev.theycreeper.murdermystery.game.MurderMysteryGame;
 import org.bukkit.Material;
 import org.bukkit.entity.Item;
 import org.bukkit.entity.Player;
@@ -14,6 +15,11 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.ItemType;
 
 public class ItemCollectListener implements Listener {
+    MurderMysteryGame game;
+    public ItemCollectListener(MurderMysteryGame game) {
+        this.game = game;
+    }
+
     @EventHandler
     public void onItemCollect(EntityPickupItemEvent event) {
         if (!(event.getEntity() instanceof Player p)) return;
@@ -21,11 +27,11 @@ public class ItemCollectListener implements Listener {
         if (event.getItem().getItemStack().getType() == Material.GOLD_INGOT) {
             if (shouldGetBow(p.getInventory())) {
                 event.setCancelled(true);
-
                 event.getItem().remove();
                 tradeGoldBow(p);
             }
         }
+        game.removeGoldFromDropped(event.getItem());
     }
 
     private boolean shouldGetBow(Inventory inv) {

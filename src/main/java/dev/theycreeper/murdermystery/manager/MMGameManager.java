@@ -72,10 +72,15 @@ public class MMGameManager implements Listener {
         if (activeGames.isEmpty() || activeGames.getFirst().game() != game) {
             throw new IllegalStateException("Cannot end a game that is not active");
         }
-        for (var player : game.getPlayerList()) {
-            player.getPlayer().sendTitle(ChatColor.GREEN + "Innocents win!",
-                    ChatColor.GRAY + "The murderer was stopped", 10, 70, 20);
+        game.innocentsWin();
+        StopGame();
+    }
+
+    public void murdererWin(MurderMysteryGame game) {
+        if (activeGames.isEmpty() || activeGames.getFirst().game() != game) {
+            throw new IllegalStateException("Cannot end a game that is not active");
         }
+        game.murdererWin();
         StopGame();
     }
 

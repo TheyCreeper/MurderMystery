@@ -41,6 +41,9 @@ public class PlayerKillListener implements Listener {
         }
         event.setCancelled(true);
         killPlayer(hitPlayer);
+        if (!game.isInnocentsLeft()) {
+            MurderMystery.getInstance().getGameManager().murdererWin(game);
+        }
     }
 
     private void handleArrowHit(EntityDamageByEntityEvent event, AbstractArrow arrow, Player shooter, Player target) {

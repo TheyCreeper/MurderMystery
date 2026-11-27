@@ -8,6 +8,7 @@ import dev.theycreeper.murdermystery.configs.ConfigHandler;
 import dev.theycreeper.murdermystery.listeners.BlockPlaceListener;
 import dev.theycreeper.murdermystery.listeners.ItemUsedListener;
 import dev.theycreeper.murdermystery.listeners.LocationMoveListener;
+import dev.theycreeper.murdermystery.listeners.OnPlayerLeaveListener;
 import dev.theycreeper.murdermystery.manager.CorpseManager;
 import dev.theycreeper.murdermystery.manager.MMGameManager;
 import dev.theycreeper.murdermystery.manager.PartyManager;
@@ -28,6 +29,7 @@ public class MurderMystery extends JavaPlugin implements Listener {
     private ItemUsedListener itemUsedListener;
     private BlockPlaceListener blockPlaceListener;
     private LocationMoveListener locationMoveListener;
+    private OnPlayerLeaveListener playerLeaveListener;
     public static MurderMystery getInstance() {
         return instance;
     }
@@ -55,10 +57,12 @@ public class MurderMystery extends JavaPlugin implements Listener {
         corpseManager = new CorpseManager(this);
         zoneCreationManager = new ZoneCreationManager();
         locationMoveListener = new LocationMoveListener();
+        playerLeaveListener = new OnPlayerLeaveListener();
         getServer().getPluginManager().registerEvents(itemUsedListener, this);
         getServer().getPluginManager().registerEvents(blockPlaceListener, this);
         getServer().getPluginManager().registerEvents(partyManager, this);
         getServer().getPluginManager().registerEvents(locationMoveListener, this);
+        getServer().getPluginManager().registerEvents(playerLeaveListener, this);
         saveDefaultConfig();
         registerCommands();
         handleConfig();
