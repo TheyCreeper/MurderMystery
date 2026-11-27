@@ -7,5 +7,6 @@ public enum PlayerType {
     infected,
     survivor,
     alpha,
-    assassin
+    assassin,
+    dead
 }

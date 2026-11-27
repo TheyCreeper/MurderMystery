@@ -4,6 +4,7 @@ import dev.theycreeper.murdermystery.MurderMystery;
 import dev.theycreeper.murdermystery.game.MurderMysteryGame;
 import dev.theycreeper.murdermystery.game.MurderMysteryZone;
 import org.bukkit.entity.Player;
+import org.bukkit.ChatColor;
 import org.bukkit.event.Listener;
 
 import java.util.ArrayList;
@@ -67,6 +68,17 @@ public class MMGameManager implements Listener {
         }
     }
 
+    public void innocentsWin(MurderMysteryGame game) {
+        if (activeGames.isEmpty() || activeGames.getFirst().game() != game) {
+            throw new IllegalStateException("Cannot end a game that is not active");
+        }
+        for (var player : game.getPlayerList()) {
+            player.getPlayer().sendTitle(ChatColor.GREEN + "Innocents win!",
+                    ChatColor.GRAY + "The murderer was stopped", 10, 70, 20);
+        }
+        StopGame();
+    }
+
     public boolean hasActiveGame() {
         return !activeGames.isEmpty();
     }
@@ -76,6 +88,16 @@ public class MMGameManager implements Listener {
                 .flatMap(session -> session.game().getPlayerList().stream())
                 .anyMatch(mmPlayer ->
                         mmPlayer.getPlayer().getUniqueId().equals(p.getUniqueId()));
+    }
+
+    public MurderMysteryGame getPlayerGame(Player p) {
+        return activeGames.stream()
+                .filter(session -> session.game().getPlayerList().stream()
+                        .anyMatch(mmPlayer ->
+                                mmPlayer.getPlayer().getUniqueId().equals(p.getUniqueId())))
+                .map(session -> session.game())
+                .findFirst()
+                .orElse(null);
     }
 
     public boolean isPlayerCanKill(Player p) {

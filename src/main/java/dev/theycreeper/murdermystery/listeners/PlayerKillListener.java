@@ -1,11 +1,12 @@
 package dev.theycreeper.murdermystery.listeners;
 
-import com.destroystokyo.paper.Title;
-import com.sun.source.doctree.HiddenTree;
 import dev.theycreeper.murdermystery.MurderMystery;
+import dev.theycreeper.murdermystery.game.MMPlayer;
 import dev.theycreeper.murdermystery.game.MurderMysteryGame;
-import net.kyori.adventure.text.Component;
+import dev.theycreeper.murdermystery.game.PlayerState;
+import dev.theycreeper.murdermystery.game.PlayerType;
 import org.bukkit.*;
+import org.bukkit.entity.AbstractArrow;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
@@ -14,8 +15,6 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.inventory.EntityEquipment;
 import org.bukkit.inventory.ItemStack;
-
-import java.awt.*;
 
 public class PlayerKillListener implements Listener {
     private final MurderMysteryGame game;
@@ -26,28 +25,66 @@ public class PlayerKillListener implements Listener {
 
     @EventHandler(ignoreCancelled = true)
     public void onPlayerHit(EntityDamageByEntityEvent event) {
-//        var test = event.getDamageSource();
-        // Bunch of checks before actually killing someone
-        if (!(event.getDamager() instanceof Player damagerPlayer)) return;
         if (!(event.getEntity() instanceof Player hitPlayer)) return;
+        if (event.getDamager() instanceof AbstractArrow arrow && arrow.getShooter() instanceof Player shooter) {
+            handleArrowHit(event, arrow, shooter, hitPlayer);
+            return;
+        }
+        if (!(event.getDamager() instanceof Player damagerPlayer)) return;
         if (game.getMmPlayer(damagerPlayer) == null && game.getMmPlayer(hitPlayer) == null) return;
         if (!playersInGame(damagerPlayer, hitPlayer) ||
+                !isAlive(damagerPlayer) || !isAlive(hitPlayer) ||
                 !game.isPlayerCanKill(damagerPlayer) ||
                 !isValidWeapon(event)) {
             event.setCancelled(true);
             return;
         }
         event.setCancelled(true);
-        game.createCorpse(hitPlayer);
-        spectatePlayer(hitPlayer);
-        hitPlayer.sendTitle(
+        killPlayer(hitPlayer);
+    }
+
+    private void handleArrowHit(EntityDamageByEntityEvent event, AbstractArrow arrow, Player shooter, Player target) {
+        MMPlayer shootingPlayer = game.getMmPlayer(shooter);
+        MMPlayer hitPlayer = game.getMmPlayer(target);
+        if (shootingPlayer == null && hitPlayer == null) return;
+        event.setCancelled(true);
+        ItemStack weapon = arrow.getWeapon();
+        arrow.remove();
+        if (shootingPlayer == null || hitPlayer == null || shooter.equals(target)
+                || shootingPlayer.getPlayerState() != PlayerState.alive
+                || hitPlayer.getPlayerState() != PlayerState.alive
+                || !isInnocentTeam(shootingPlayer.getPlayerType())
+                || weapon == null || weapon.getType() != Material.BOW) return;
+
+        if (hitPlayer.getPlayerType() == PlayerType.murderer) {
+            MurderMystery.getInstance().getGameManager().innocentsWin(game);
+        } else if (isInnocentTeam(hitPlayer.getPlayerType())) {
+            killPlayer(target);
+            killPlayer(shooter);
+        }
+    }
+
+    private boolean isInnocentTeam(PlayerType type) {
+        return type == PlayerType.innocent || type == PlayerType.detective;
+    }
+
+    private boolean isAlive(Player player) {
+        MMPlayer mmPlayer = game.getMmPlayer(player);
+        return mmPlayer != null && mmPlayer.getPlayerState() == PlayerState.alive;
+    }
+
+    private void killPlayer(Player player) {
+        game.createCorpse(player);
+        game.getMmPlayer(player).setPlayerState(PlayerState.dead);
+        spectatePlayer(player);
+        player.sendTitle(
                 ChatColor.RED + "You Died!",   // Main title
                 ChatColor.GRAY + "You are now a spectator", // Subtitle (or "" / null)
                 10,                               // Fade in (ticks)
                 70,                               // Stay on screen (ticks)
                 20                                // Fade out (ticks)
         );
-        hitPlayer.getWorld().playSound(hitPlayer.getLocation(), Sound.ENTITY_PLAYER_HURT, 3.0F, 1.0F);
+        player.getWorld().playSound(player.getLocation(), "minecraft:entity.player.hurt", 3.0F, 1.0F);
     }
 
     private void spectatePlayer(Player player) {
@@ -76,19 +113,6 @@ public class PlayerKillListener implements Listener {
                 weaponUsed = equipment.getItemInMainHand();
             }
         }
-//        // 2. Ranged Attack (Bow, Crossbow, Trident)
-//        else if (damager instanceof Projectile projectile) {
-//            ProjectileSource shooter = projectile.getShooter();
-//            if (shooter instanceof LivingEntity livingShooter) {
-//                EntityEquipment equipment = livingShooter.getEquipment();
-//                if (equipment != null) {
-//                    // Note: This gets what they are currently holding, which could
-//                    // differ if they switched slots after firing.
-//                    weaponUsed = equipment.getItemInMainHand();
-//                }
-//            }
-//        }
-
         // Verify a valid item was found (empty hand returns Material.AIR)
         if (weaponUsed != null && weaponUsed.getType() != Material.AIR) {
             Material toolType = weaponUsed.getType();

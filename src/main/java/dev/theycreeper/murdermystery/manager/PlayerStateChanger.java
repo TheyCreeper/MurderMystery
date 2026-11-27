@@ -80,11 +80,16 @@ public class PlayerStateChanger {
         ItemStack item = new ItemStack(material, 1);
         ItemMeta meta = item.getItemMeta();
         meta.displayName(Component.text(name));
+        meta.setUnbreakable(true);
         item.setItemMeta(meta);
         return item;
     }
     private static ItemStack getItem(Material material) {
-        return new ItemStack(material, 1);
+        ItemStack item = new ItemStack(material, 1);
+        ItemMeta meta = item.getItemMeta();
+        meta.setUnbreakable(true);
+        item.setItemMeta(meta);
+        return item;
     }
 
     private static void savePlayerInventory(Player p) {
@@ -96,11 +101,13 @@ public class PlayerStateChanger {
     public static void pushInventoryInnocent(Player p) {
         p.getInventory().clear();
         p.setGameMode(GameMode.ADVENTURE);
+        p.getInventory().setHeldItemSlot(0);
     }
 
     public static void pushInventoryPlayerMurderer(Player p) {
         p.getInventory().clear();
         Inventory inv = p.getInventory();
+        p.getInventory().setHeldItemSlot(0);
 
         inv.setItem(1, getItem(Material.STONE_SWORD));
         p.setGameMode(GameMode.ADVENTURE);
@@ -109,6 +116,7 @@ public class PlayerStateChanger {
     public static void pushInventoryPlayerDetective(Player p) {
         p.getInventory().clear();
         Inventory inv = p.getInventory();
+        p.getInventory().setHeldItemSlot(0);
 
         inv.setItem(1, getItem(Material.BOW));
         inv.setItem(2, getItem(Material.ARROW));

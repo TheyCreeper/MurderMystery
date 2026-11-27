@@ -2,6 +2,7 @@ package dev.theycreeper.murdermystery.manager;
 
 import dev.theycreeper.murdermystery.MurderMystery;
 import dev.theycreeper.murdermystery.game.MurderMysteryGame;
+import dev.theycreeper.murdermystery.game.MMPlayer;
 import dev.theycreeper.murdermystery.game.MurderMysteryZone;
 import org.bukkit.entity.Player;
 import org.junit.jupiter.api.Test;
@@ -16,6 +17,35 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 class MMGameManagerTest {
+    @Test
+    void innocentWinAnnouncesAndStopsTheMatchingGame() {
+        MurderMystery plugin = mock(MurderMystery.class);
+        ZoneCreationManager zones = mock(ZoneCreationManager.class);
+        MurderMysteryZone map = new MurderMysteryZone();
+        Player first = mock(Player.class);
+        Player second = mock(Player.class);
+        when(first.getUniqueId()).thenReturn(UUID.randomUUID());
+        when(second.getUniqueId()).thenReturn(UUID.randomUUID());
+        when(plugin.getZoneCreationManager()).thenReturn(zones);
+        when(zones.loadMap(map)).thenReturn(true);
+        try (MockedStatic<MurderMystery> instance = mockStatic(MurderMystery.class);
+             MockedConstruction<MurderMysteryGame> games = mockConstruction(MurderMysteryGame.class)) {
+            instance.when(MurderMystery::getInstance).thenReturn(plugin);
+            MMGameManager manager = new MMGameManager();
+            manager.StartGame(new ArrayList<>(List.of(first, second)), map);
+            MurderMysteryGame game = games.constructed().getFirst();
+            when(game.getPlayerList()).thenReturn(List.of(new MMPlayer(first), new MMPlayer(second)));
+            assertThrows(IllegalStateException.class, () -> manager.innocentsWin(mock(MurderMysteryGame.class)));
+            assertTrue(manager.hasActiveGame());
+            manager.innocentsWin(game);
+            verify(first).sendTitle(contains("Innocents win!"), anyString(), eq(10), eq(70), eq(20));
+            verify(second).sendTitle(contains("Innocents win!"), anyString(), eq(10), eq(70), eq(20));
+            verify(game).EndGame();
+            verify(zones).unloadMap(map);
+            assertFalse(manager.hasActiveGame());
+        }
+    }
+
     @Test
     void loadsSelectedMapForGameAndUnloadsOnStop() {
         MurderMystery plugin = mock(MurderMystery.class);

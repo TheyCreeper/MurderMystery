@@ -15,4 +15,5 @@ commands:
     description: Create a new murder mystery map
   party:
     description: Manage your party
-    usage: /party <invite|accept|decline|kick|leave|list|disband>
+    aliases: [p]
+    usage: /party <player...> or /party <invite|accept|decline|kick> <player> or /party <leave|list|disband>

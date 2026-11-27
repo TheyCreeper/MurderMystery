@@ -24,20 +24,32 @@ public class PartyCommand implements CommandExecutor {
             sender.sendMessage("Only players can use party commands.");
             return true;
         }
-        if (args.length == 1) {
-            switch (args[0].toLowerCase(Locale.ROOT)) {
-                case "leave" -> parties.leave(player);
-                case "disband" -> parties.disband(player);
-                case "list" -> parties.list(player);
-                default -> sendUsage(player);
+        if (args.length == 0) {
+            sendUsage(player);
+            return true;
+        }
+        String action = args[0].toLowerCase(Locale.ROOT);
+        if (action.equals("leave") || action.equals("disband") || action.equals("list")) {
+            if (args.length != 1) {
+                sendUsage(player);
+            } else {
+                switch (action) {
+                    case "leave" -> parties.leave(player);
+                    case "disband" -> parties.disband(player);
+                    case "list" -> parties.list(player);
+                }
             }
-        } else if (args.length == 2 && isPlayerAction(args[0])) {
+        } else if (isPlayerAction(action)) {
+            if (args.length != 2) {
+                sendUsage(player);
+                return true;
+            }
             Player target = Bukkit.getPlayerExact(args[1]);
             if (target == null) {
                 player.sendMessage("Player not found or offline: " + args[1]);
                 return true;
             }
-            switch (args[0].toLowerCase(Locale.ROOT)) {
+            switch (action) {
                 case "invite" -> parties.invite(player, target);
                 case "accept" -> parties.accept(player, target);
                 case "decline" -> parties.decline(player, target);
@@ -45,17 +57,24 @@ public class PartyCommand implements CommandExecutor {
                 default -> throw new IllegalStateException("Unknown party action");
             }
         } else {
-            sendUsage(player);
+            for (String name : args) {
+                Player target = Bukkit.getPlayerExact(name);
+                if (target == null) {
+                    player.sendMessage("Player not found or offline: " + name);
+                } else {
+                    parties.invite(player, target);
+                }
+            }
         }
         return true;
     }
 
     private void sendUsage(Player player) {
-        player.sendMessage("Usage: /party <invite|accept|decline|kick> <player> or /party <leave|list|disband>");
+        player.sendMessage("Usage: /party <player...> or /party <invite|accept|decline|kick> <player> or /party <leave|list|disband>");
     }
 
     private boolean isPlayerAction(String action) {
-        return switch (action.toLowerCase(Locale.ROOT)) {
+        return switch (action) {
             case "invite", "accept", "decline", "kick" -> true;
             default -> false;
         };

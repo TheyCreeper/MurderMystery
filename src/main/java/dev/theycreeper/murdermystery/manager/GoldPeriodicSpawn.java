@@ -46,7 +46,7 @@ public class GoldPeriodicSpawn {
         };
 
         // Run immediately, then every 100 ticks (5 seconds)
-        spawner.runTaskTimer(MurderMystery.getInstance(), 0L, 120L);
+        spawner.runTaskTimer(MurderMystery.getInstance(), 0L, 200L);
     }
 
     private Location getRandomValidLocation(List<Pair<Location,Location>> locations) {
