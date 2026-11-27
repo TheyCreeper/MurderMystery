@@ -9,12 +9,14 @@ import dev.theycreeper.murdermystery.model.MMTimer;
 import dev.theycreeper.murdermystery.model.Pair;
 import dev.theycreeper.murdermystery.saving.SQLHandler;
 import org.bukkit.*;
+import org.bukkit.block.Block;
 import org.bukkit.entity.Display;
 import org.bukkit.entity.Item;
 import org.bukkit.entity.ItemDisplay;
 import org.bukkit.entity.Player;
 import org.bukkit.event.HandlerList;
 import org.bukkit.event.Listener;
+import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scoreboard.*;
@@ -23,12 +25,18 @@ import org.joml.AxisAngle4f;
 import org.joml.Vector3f;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ThreadLocalRandom;
 
 public class MurderMysteryGame implements Listener {
+    private static final int RANDOM_SPAWN_ATTEMPTS = 128;
+    private static final int MAX_SPAWN_SEARCH_BLOCKS = 100_000;
     private BukkitRunnable ticker, goldSpawner;
     List<MMPlayer> playerList = new ArrayList<MMPlayer>();
     int playersLeft, murdererKills, goldTickCounter;
@@ -37,6 +45,7 @@ public class MurderMysteryGame implements Listener {
     private List<Listener> eventListeners = new ArrayList<Listener>();
     private final List<UUID> corpses = new ArrayList<>();
     private final Set<UUID> preparedPlayers = new HashSet<>();
+    private final Set<UUID> returningPlayers = new HashSet<>();
     private int currentGoldAmount;
     private MurderMysteryZone zone;
     private ItemDisplay droppedBow;
@@ -116,13 +125,34 @@ public class MurderMysteryGame implements Listener {
 
     public void removePlayer(Player player) {
         MMPlayer mmPlayer = getMmPlayer(player);
-        if (mmPlayer.getPlayerType() == PlayerType.detective) {
-            createDetectiveBow(player.getLocation());
-        } else if (mmPlayer.getPlayerType() == PlayerType.murderer) {
-            MurderMystery.getInstance().getGameManager().innocentsWin(this);
-        } else  {
-            playerList.remove(getMmPlayer(player));
+        if (mmPlayer == null) throw new IllegalStateException("Player is not in this game");
+        Location gameLocation = player.getLocation();
+        RuntimeException failure = null;
+        try {
+            restorePlayer(player);
+        } catch (RuntimeException e) {
+            failure = e;
         }
+        if (!preparedPlayers.contains(player.getUniqueId())) {
+            playerList.remove(mmPlayer);
+            try {
+                if (mmPlayer.getPlayerState() == PlayerState.alive
+                        && mmPlayer.getPlayerType() == PlayerType.detective) {
+                    createDetectiveBow(gameLocation);
+                } else if (mmPlayer.getPlayerState() == PlayerState.alive
+                        && mmPlayer.getPlayerType() == PlayerType.murderer) {
+                    MurderMystery.getInstance().getGameManager().innocentsWin(this);
+                }
+            } catch (RuntimeException e) {
+                if (failure == null) failure = e;
+                else failure.addSuppressed(e);
+            }
+        }
+        if (failure != null) throw failure;
+    }
+
+    public boolean isReturningPlayer(Player player) {
+        return returningPlayers.contains(player.getUniqueId());
     }
 
     public MMPlayer getMmPlayer(Player player) {
@@ -226,9 +256,105 @@ public class MurderMysteryGame implements Listener {
 
     public void StartGame() {
         var pluginManager = MurderMystery.getInstance().getServer().getPluginManager();
+        teleportPlayersSpawn();
         eventListeners.forEach(listener -> pluginManager.registerEvents(listener, MurderMystery.getInstance()));
         mmTimer = new MMTimer(4, 30);
         startTicker();
+    }
+
+    private void teleportPlayersSpawn() {
+        if (playerList.isEmpty()) return;
+        Location corner1 = zone.getCorner1();
+        Location corner2 = zone.getCorner2();
+        if (corner1 == null || corner2 == null || corner1.getWorld() == null
+                || !corner1.getWorld().equals(corner2.getWorld())) {
+            throw new IllegalStateException("Map must have two corners in the same loaded world");
+        }
+
+        World world = corner1.getWorld();
+        int minX = Math.min(corner1.getBlockX(), corner2.getBlockX());
+        int maxX = Math.max(corner1.getBlockX(), corner2.getBlockX());
+        int minY = Math.max(Math.min(corner1.getBlockY(), corner2.getBlockY()), world.getMinHeight() + 1);
+        int maxY = Math.min(Math.max(corner1.getBlockY(), corner2.getBlockY()) - 1, world.getMaxHeight() - 2);
+        int minZ = Math.min(corner1.getBlockZ(), corner2.getBlockZ());
+        int maxZ = Math.max(corner1.getBlockZ(), corner2.getBlockZ());
+        if (minY > maxY) throw new IllegalStateException("Map has no room for a safe player spawn");
+
+        Set<Location> spawns = new HashSet<>();
+        Map<Long, Integer> highestSolidBlocks = new HashMap<>();
+        ThreadLocalRandom random = ThreadLocalRandom.current();
+        for (int i = 0; i < RANDOM_SPAWN_ATTEMPTS && spawns.size() < playerList.size(); i++) {
+            int x = (int) random.nextLong(minX, (long) maxX + 1);
+            int y = (int) random.nextLong(minY, (long) maxY + 1);
+            int z = (int) random.nextLong(minZ, (long) maxZ + 1);
+            addSafeSpawn(spawns, highestSolidBlocks, world, x, y, z);
+        }
+        int searched = 0;
+        search:
+        for (long x = minX; x <= maxX; x++) {
+            for (long z = minZ; z <= maxZ; z++) {
+                for (int y = minY; y <= maxY; y++) {
+                    if (spawns.size() >= playerList.size() || searched++ >= MAX_SPAWN_SEARCH_BLOCKS) break search;
+                    addSafeSpawn(spawns, highestSolidBlocks, world, (int) x, y, (int) z);
+                }
+            }
+        }
+        if (spawns.isEmpty()) {
+            throw new IllegalStateException("Could not find a safe covered spawn in the map within the search limit");
+        }
+
+        List<Location> choices = new ArrayList<>(spawns);
+        Collections.shuffle(choices);
+        List<Player> teleported = new ArrayList<>();
+        List<Location> originals = new ArrayList<>();
+        try {
+            for (int i = 0; i < playerList.size(); i++) {
+                Player player = playerList.get(i).getPlayer();
+                Location original = player.getLocation();
+                Location spawn = choices.get(i % choices.size()).clone();
+                spawn.setYaw(original.getYaw());
+                spawn.setPitch(original.getPitch());
+                if (!player.teleport(spawn)) {
+                    throw new IllegalStateException("Could not teleport " + player.getName() + " to the map");
+                }
+                teleported.add(player);
+                originals.add(original);
+            }
+        } catch (RuntimeException failure) {
+            for (int i = 0; i < teleported.size(); i++) {
+                try {
+                    if (!teleported.get(i).teleport(originals.get(i))) {
+                        failure.addSuppressed(new IllegalStateException(
+                                "Could not return " + teleported.get(i).getName() + " to their original location"));
+                    }
+                } catch (RuntimeException rollbackFailure) {
+                    failure.addSuppressed(rollbackFailure);
+                }
+            }
+            throw failure;
+        }
+    }
+
+    private void addSafeSpawn(Set<Location> spawns, Map<Long, Integer> highestSolidBlocks,
+                              World world, int x, int y, int z) {
+        Location location = new Location(world, x + 0.5, y, z + 0.5);
+        if (!world.getWorldBorder().isInside(location)) return;
+        Block floor = world.getBlockAt(x, y - 1, z);
+        Material floorType = floor.getType();
+        if (!floor.isSolid() || floorType == Material.BARRIER || floorType == Material.MAGMA_BLOCK
+                || floorType == Material.CACTUS || floorType == Material.CAMPFIRE
+                || floorType == Material.SOUL_CAMPFIRE) return;
+        if (!world.getBlockAt(x, y, z).isEmpty() || !world.getBlockAt(x, y + 1, z).isEmpty()) return;
+        long column = ((long) x << 32) | (z & 0xffffffffL);
+        int highestSolid = highestSolidBlocks.computeIfAbsent(column, key -> {
+            for (int height = world.getHighestBlockYAt(x, z); height >= world.getMinHeight(); height--) {
+                Block block = world.getBlockAt(x, height, z);
+                if (block.isSolid() && block.getType() != Material.BARRIER) return height;
+            }
+            return world.getMinHeight() - 1;
+        });
+        if (highestSolid <= y + 1) return;
+        spawns.add(location);
     }
 
     public void createCorpse(Player player) {
@@ -245,9 +371,7 @@ public class MurderMysteryGame implements Listener {
             player.setScoreboard(Bukkit.getScoreboardManager().getNewScoreboard());
             if (!preparedPlayers.contains(player.getUniqueId())) continue;
             try {
-                PlayerStateChanger.normalMode(player,
-                        SQLHandler.getInstance().getPlayerGamemode(player.getUniqueId()));
-                revivePlayer(player);
+                restorePlayer(player);
             } catch (RuntimeException e) {
                 if (failure == null) failure = e;
                 else failure.addSuppressed(e);
@@ -263,6 +387,23 @@ public class MurderMysteryGame implements Listener {
         removeDetectiveBow();
         murdererKills = 0;
         if (failure != null) throw failure;
+    }
+
+    private void restorePlayer(Player player) {
+        UUID uuid = player.getUniqueId();
+        SQLHandler database = SQLHandler.getInstance();
+        PlayerStateChanger.normalMode(player, database.getPlayerGamemode(uuid));
+        preparedPlayers.remove(uuid);
+        revivePlayer(player);
+        Location location = database.getPlayerLocation(uuid);
+        returningPlayers.add(uuid);
+        try {
+            if (!player.teleport(location)) {
+                throw new IllegalStateException("Could not return " + player.getName() + " to their saved location");
+            }
+        } finally {
+            returningPlayers.remove(uuid);
+        }
     }
 
     public void revivePlayer(Player player) {
@@ -454,5 +595,28 @@ public class MurderMysteryGame implements Listener {
                 corner1.getY() + 1,
                 z
         );
+    }
+
+    public boolean isGoingOutOfBounds(PlayerMoveEvent event) {
+        Location corner1 = zone.getCorner1();
+        Location corner2 = zone.getCorner2();
+        if (corner1 == null || corner2 == null || corner1.getWorld() == null
+                || !corner1.getWorld().equals(corner2.getWorld())) {
+            throw new IllegalStateException("Map must have two corners in the same loaded world");
+        }
+
+        Location destination = event.getTo();
+        destination.checkFinite();
+        if (!corner1.getWorld().equals(destination.getWorld())) return true;
+
+        int x = destination.getBlockX();
+        int y = destination.getBlockY();
+        int z = destination.getBlockZ();
+        return x < Math.min(corner1.getBlockX(), corner2.getBlockX())
+                || x > Math.max(corner1.getBlockX(), corner2.getBlockX())
+                || y < Math.min(corner1.getBlockY(), corner2.getBlockY())
+                || y > Math.max(corner1.getBlockY(), corner2.getBlockY())
+                || z < Math.min(corner1.getBlockZ(), corner2.getBlockZ())
+                || z > Math.max(corner1.getBlockZ(), corner2.getBlockZ());
     }
 }

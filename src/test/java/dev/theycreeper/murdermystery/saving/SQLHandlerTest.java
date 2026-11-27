@@ -5,8 +5,10 @@ import dev.theycreeper.murdermystery.model.Pair;
 import org.bukkit.Bukkit;
 import org.bukkit.GameMode;
 import org.bukkit.Location;
+import org.bukkit.Material;
 import org.bukkit.World;
 import org.bukkit.entity.Player;
+import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.PlayerInventory;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -62,9 +64,61 @@ class SQLHandlerTest {
         when(player.getName()).thenReturn("player");
         when(player.getInventory()).thenReturn(inventory);
         when(player.getGameMode()).thenReturn(GameMode.CREATIVE, GameMode.SURVIVAL);
+        Location first = new Location(world, -3.25, 70.5, 6, 90, -15);
+        Location second = new Location(world, 10, 64, -2, 20, 5);
+        when(player.getLocation()).thenReturn(first, second);
         handler.storeInventory(player);
         assertEquals(GameMode.CREATIVE, handler.getPlayerGamemode(uuid));
+        assertEquals(first, handler.getPlayerLocation(uuid));
         handler.storeInventory(player);
+        assertEquals(GameMode.SURVIVAL, handler.getPlayerGamemode(uuid));
+        assertEquals(second, handler.getPlayerLocation(uuid));
+    }
+
+    @Test
+    void playerLocationsCanBeSetAndRetrievedByUuid() {
+        UUID uuid = UUID.randomUUID();
+        UUID other = UUID.randomUUID();
+        Location first = new Location(world, -1.25, 72.5, 3.75, 35, -12);
+        Location second = new Location(world, 4, 5, 6, -90, 30);
+        assertThrows(IllegalStateException.class, () -> handler.getPlayerLocation(uuid));
+        handler.setPlayerLocation(uuid, first);
+        handler.setPlayerLocation(other, second);
+        handler.setPlayerLocation(uuid, second);
+        assertEquals(second, handler.getPlayerLocation(uuid));
+        assertEquals(second, handler.getPlayerLocation(other));
+        assertThrows(IllegalArgumentException.class,
+                () -> handler.setPlayerLocation(uuid, new Location(world, Double.NaN, 1, 2)));
+        assertEquals(second, handler.getPlayerLocation(uuid));
+        UUID worldId = world.getUID();
+        bukkit.when(() -> Bukkit.getWorld(worldId)).thenReturn(null);
+        assertThrows(IllegalStateException.class, () -> handler.getPlayerLocation(uuid));
+    }
+
+    @Test
+    void inventoryFailureRollsBackLocationAndGamemode() throws Exception {
+        Player player = mock(Player.class);
+        PlayerInventory inventory = mock(PlayerInventory.class);
+        ItemStack item = mock(ItemStack.class);
+        UUID uuid = UUID.randomUUID();
+        Location first = new Location(world, 1, 2, 3);
+        Location second = new Location(world, 8, 9, 10);
+        when(player.getUniqueId()).thenReturn(uuid);
+        when(player.getName()).thenReturn("player");
+        when(player.getInventory()).thenReturn(inventory);
+        when(player.getGameMode()).thenReturn(GameMode.SURVIVAL, GameMode.CREATIVE);
+        when(player.getLocation()).thenReturn(first, second);
+        when(inventory.getSize()).thenReturn(0, 1);
+        when(inventory.getItem(0)).thenReturn(item);
+        when(item.getType()).thenReturn(Material.GOLD_INGOT);
+        when(item.getAmount()).thenReturn(1);
+        when(item.serializeAsBytes()).thenReturn(new byte[]{1});
+        handler.storeInventory(player);
+        try (Statement statement = database.createStatement()) {
+            statement.execute("CREATE TRIGGER fail_inventory BEFORE INSERT ON inventory_item BEGIN SELECT RAISE(ABORT, 'test failure'); END");
+        }
+        assertThrows(IllegalStateException.class, () -> handler.storeInventory(player));
+        assertEquals(first, handler.getPlayerLocation(uuid));
         assertEquals(GameMode.SURVIVAL, handler.getPlayerGamemode(uuid));
     }
 

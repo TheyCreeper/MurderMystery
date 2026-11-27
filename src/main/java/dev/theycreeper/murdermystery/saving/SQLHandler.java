@@ -14,6 +14,7 @@ import org.bukkit.inventory.ItemStack;
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.logging.Logger;
 
@@ -55,6 +56,16 @@ public class SQLHandler {
                         "amount" INTEGER NOT NULL DEFAULT 1,
                         "item_data" BLOB NOT NULL,
                         FOREIGN KEY("uuid") REFERENCES "player"("uuid")
+                    )""");
+            statement.execute("""
+                    CREATE TABLE IF NOT EXISTS "player_location" (
+                        "uuid" TEXT NOT NULL PRIMARY KEY,
+                        "world" TEXT NOT NULL,
+                        "x" REAL NOT NULL,
+                        "y" REAL NOT NULL,
+                        "z" REAL NOT NULL,
+                        "yaw" REAL NOT NULL,
+                        "pitch" REAL NOT NULL
                     )""");
             statement.execute("""
                     CREATE TABLE IF NOT EXISTS "location" (
@@ -361,6 +372,55 @@ public class SQLHandler {
         throw new IllegalStateException("No stored gamemode for " + uuid);
     }
 
+    public void setPlayerLocation(UUID uuid, Location location) {
+        Objects.requireNonNull(uuid, "Player UUID must not be null");
+        validatePlayerLocation(location);
+        try {
+            setPlayerLocation(getConnection(), uuid, location);
+        } catch (SQLException e) {
+            logger.severe("Failed to store location for " + uuid + ": " + e.getMessage());
+            throw new IllegalStateException("Failed to store location for " + uuid, e);
+        }
+    }
+
+    public Location getPlayerLocation(UUID uuid) {
+        Objects.requireNonNull(uuid, "Player UUID must not be null");
+        try (PreparedStatement statement = getConnection().prepareStatement(
+                "SELECT world, x, y, z, yaw, pitch FROM player_location WHERE uuid = ?")) {
+            statement.setString(1, uuid.toString());
+            try (ResultSet row = statement.executeQuery()) {
+                if (row.next()) return readLocation(row, "");
+            }
+        } catch (SQLException e) {
+            logger.severe("Failed to retrieve location for " + uuid + ": " + e.getMessage());
+            throw new IllegalStateException("Failed to retrieve location for " + uuid, e);
+        }
+        throw new IllegalStateException("No stored location for " + uuid);
+    }
+
+    private void validatePlayerLocation(Location location) {
+        if (location == null || location.getWorld() == null) {
+            throw new IllegalArgumentException("Player location must have a loaded world");
+        }
+        location.checkFinite();
+    }
+
+    private void setPlayerLocation(Connection database, UUID uuid, Location location) throws SQLException {
+        try (PreparedStatement statement = database.prepareStatement("""
+                INSERT INTO player_location (uuid, world, x, y, z, yaw, pitch) VALUES (?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(uuid) DO UPDATE SET world = excluded.world, x = excluded.x, y = excluded.y,
+                    z = excluded.z, yaw = excluded.yaw, pitch = excluded.pitch""")) {
+            statement.setString(1, uuid.toString());
+            statement.setString(2, location.getWorld().getUID().toString());
+            statement.setDouble(3, location.getX());
+            statement.setDouble(4, location.getY());
+            statement.setDouble(5, location.getZ());
+            statement.setFloat(6, location.getYaw());
+            statement.setFloat(7, location.getPitch());
+            statement.executeUpdate();
+        }
+    }
+
     public Inventory getStoredInventory(UUID uuid) {
         Inventory inventory = Bukkit.createInventory(null, 45);
         String query = "SELECT slot, item_data FROM inventory_item WHERE uuid = ? ORDER BY slot";
@@ -384,6 +444,8 @@ public class SQLHandler {
 
     public void storeInventory(Player player) {
         UUID uuid = player.getUniqueId();
+        Location location = player.getLocation();
+        validatePlayerLocation(location);
         Connection database;
         try {
             database = getConnection();
@@ -401,6 +463,7 @@ public class SQLHandler {
                     ensurePlayer.setString(2, player.getName());
                     ensurePlayer.setString(3, player.getGameMode().name());
                     ensurePlayer.executeUpdate();
+                    setPlayerLocation(database, uuid, location);
 
                     deleteInventory.setString(1, uuid.toString());
                     deleteInventory.executeUpdate();
@@ -421,7 +484,7 @@ public class SQLHandler {
                     insertItem.executeBatch();
                 }
                 database.commit();
-            } catch (SQLException e) {
+            } catch (SQLException | RuntimeException e) {
                 try {
                     database.rollback();
                 } catch (SQLException rollbackError) {
