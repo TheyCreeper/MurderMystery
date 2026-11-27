@@ -22,19 +22,25 @@ class MMGameManagerTest {
         ZoneCreationManager zones = mock(ZoneCreationManager.class);
         MurderMysteryZone map = new MurderMysteryZone();
         Player player = mock(Player.class);
+        Player member = mock(Player.class);
         when(player.getUniqueId()).thenReturn(UUID.randomUUID());
+        when(member.getUniqueId()).thenReturn(UUID.randomUUID());
         when(plugin.getZoneCreationManager()).thenReturn(zones);
         when(zones.loadMap(map)).thenReturn(true);
         try (MockedStatic<MurderMystery> instance = mockStatic(MurderMystery.class);
              MockedConstruction<MurderMysteryGame> games = mockConstruction(MurderMysteryGame.class)) {
             instance.when(MurderMystery::getInstance).thenReturn(plugin);
             MMGameManager manager = new MMGameManager();
-            ArrayList<Player> players = new ArrayList<>(List.of(player));
-            assertTrue(manager.StartGame(players, player, map));
+            ArrayList<Player> players = new ArrayList<>(List.of(player, member));
+            assertTrue(manager.StartGame(players, map));
             assertTrue(manager.hasActiveGame());
             MurderMysteryGame game = games.constructed().getFirst();
+            verify(game).addPlayer(player);
+            verify(game).addPlayer(member);
+            verify(game).setMurderer(any());
+            verify(game).setDetective(any());
             verify(game).StartGame();
-            assertThrows(IllegalStateException.class, () -> manager.StartGame(players, player, map));
+            assertThrows(IllegalStateException.class, () -> manager.StartGame(players, map));
             manager.StopGame();
             assertFalse(manager.hasActiveGame());
             verify(game).EndGame();
@@ -55,7 +61,7 @@ class MMGameManagerTest {
              MockedConstruction<MurderMysteryGame> games = mockConstruction(MurderMysteryGame.class)) {
             instance.when(MurderMystery::getInstance).thenReturn(plugin);
             MMGameManager manager = new MMGameManager();
-            assertFalse(manager.StartGame(new ArrayList<>(List.of(player)), player, map));
+            assertFalse(manager.StartGame(new ArrayList<>(List.of(player)), map));
             assertFalse(manager.hasActiveGame());
             assertTrue(games.constructed().isEmpty());
             verify(zones, never()).unloadMap(map);
@@ -68,14 +74,16 @@ class MMGameManagerTest {
         ZoneCreationManager zones = mock(ZoneCreationManager.class);
         MurderMysteryZone map = new MurderMysteryZone();
         Player player = mock(Player.class);
+        Player member = mock(Player.class);
         when(player.getUniqueId()).thenReturn(UUID.randomUUID());
+        when(member.getUniqueId()).thenReturn(UUID.randomUUID());
         when(plugin.getZoneCreationManager()).thenReturn(zones);
         when(zones.loadMap(map)).thenReturn(true);
         try (MockedStatic<MurderMystery> instance = mockStatic(MurderMystery.class);
              MockedConstruction<MurderMysteryGame> games = mockConstruction(MurderMysteryGame.class)) {
             instance.when(MurderMystery::getInstance).thenReturn(plugin);
             MMGameManager manager = new MMGameManager();
-            manager.StartGame(new ArrayList<>(List.of(player)), player, map);
+            manager.StartGame(new ArrayList<>(List.of(player, member)), map);
             doThrow(new IllegalStateException("cleanup failed")).when(games.constructed().getFirst()).EndGame();
             assertThrows(IllegalStateException.class, manager::StopGame);
             verify(zones).unloadMap(map);

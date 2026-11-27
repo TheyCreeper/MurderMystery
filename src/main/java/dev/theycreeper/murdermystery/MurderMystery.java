@@ -1,6 +1,7 @@
 package dev.theycreeper.murdermystery;
 
 import dev.theycreeper.murdermystery.commands.CreateNewMMZone;
+import dev.theycreeper.murdermystery.commands.PartyCommand;
 import dev.theycreeper.murdermystery.commands.StartMurderMystery;
 import dev.theycreeper.murdermystery.commands.StopMurderMystery;
 import dev.theycreeper.murdermystery.configs.ConfigHandler;
@@ -8,6 +9,7 @@ import dev.theycreeper.murdermystery.listeners.BlockPlaceListener;
 import dev.theycreeper.murdermystery.listeners.ItemUsedListener;
 import dev.theycreeper.murdermystery.manager.CorpseManager;
 import dev.theycreeper.murdermystery.manager.MMGameManager;
+import dev.theycreeper.murdermystery.manager.PartyManager;
 import dev.theycreeper.murdermystery.manager.ZoneCreationManager;
 import dev.theycreeper.murdermystery.saving.SQLHandler;
 import org.bukkit.block.Block;
@@ -19,6 +21,7 @@ import java.util.Objects;
 public class MurderMystery extends JavaPlugin implements Listener {
     private static MurderMystery instance;
     private MMGameManager gameManager;
+    private PartyManager partyManager;
     private CorpseManager corpseManager;
     private ZoneCreationManager zoneCreationManager;
     private ItemUsedListener itemUsedListener;
@@ -29,6 +32,10 @@ public class MurderMystery extends JavaPlugin implements Listener {
 
     public MMGameManager getGameManager() {
         return gameManager;
+    }
+
+    public PartyManager getPartyManager() {
+        return partyManager;
     }
 
     public CorpseManager getCorpseManager() {
@@ -42,10 +49,12 @@ public class MurderMystery extends JavaPlugin implements Listener {
         itemUsedListener = new ItemUsedListener(zoneCreationManager);
         blockPlaceListener = new BlockPlaceListener();
         gameManager = new MMGameManager();
+        partyManager = new PartyManager();
         corpseManager = new CorpseManager(this);
         zoneCreationManager = new ZoneCreationManager();
         getServer().getPluginManager().registerEvents(itemUsedListener, this);
         getServer().getPluginManager().registerEvents(blockPlaceListener, this);
+        getServer().getPluginManager().registerEvents(partyManager, this);
         saveDefaultConfig();
         registerCommands();
         handleConfig();
@@ -66,6 +75,7 @@ public class MurderMystery extends JavaPlugin implements Listener {
         Objects.requireNonNull(this.getCommand("mmstart")).setExecutor(new StartMurderMystery());
         Objects.requireNonNull(this.getCommand("mmstop")).setExecutor(new StopMurderMystery());
         Objects.requireNonNull(this.getCommand("mmnew")).setExecutor(new CreateNewMMZone());
+        Objects.requireNonNull(this.getCommand("party")).setExecutor(new PartyCommand(partyManager));
     }
 
     private void handleConfig() {

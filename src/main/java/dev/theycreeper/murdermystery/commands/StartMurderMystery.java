@@ -25,7 +25,7 @@ public class StartMurderMystery implements CommandExecutor {
                 commandSender.sendMessage("Map not found: " + strings[0]);
                 return true;
             }
-            if (!gameManager.StartGame(CommandUtils.getAllPlayers(), p, map)) {
+            if (!gameManager.StartGame(MurderMystery.getInstance().getPartyManager().playersForGame(p), map)) {
                 commandSender.sendMessage("Cannot start: barrier locations are obstructed and highlighted in red.");
                 return true;
             }

@@ -13,9 +13,9 @@ import org.bukkit.inventory.meta.ItemMeta;
 
 public class PlayerStateChanger {
     public static void normalMode(Player player, GameMode mode) {
+        Inventory backedInv = SQLHandler.getInstance().getStoredInventory(player.getUniqueId());
         player.setGameMode(mode);
         player.getInventory().clear();
-        Inventory backedInv = SQLHandler.getInstance().getStoredInventory(player.getUniqueId());
         PlayerInventory inv = player.getInventory();
         for (int i = 0; i < 36; i++) {
             inv.setItem(i, backedInv.getItem(i));
@@ -26,23 +26,15 @@ public class PlayerStateChanger {
         inv.setBoots(backedInv.getItem(39));
         inv.setItemInOffHand(backedInv.getItem(40));
 
-        player.setFlying(false);
-        player.setAllowFlight(false);
-
-        player.setCollidable(true);
-
         player.showPlayer(MurderMystery.getInstance(), player);
         player.setHealth(20.0);
         player.setFoodLevel(20);
         player.setFireTicks(0);
     }
 
-    public static GameMode editingMode(Player p) {
-        SQLHandler.getInstance().storeInventory(p);
-        p.getInventory().clear();
-        GameMode temp = p.getGameMode();
+    public static void editingMode(Player p) {
+        savePlayerInventory(p);
         p.setGameMode(GameMode.CREATIVE);
-        return temp;
     }
 
     public static void PushMainMenu(Player p) {
@@ -90,5 +82,36 @@ public class PlayerStateChanger {
         meta.displayName(Component.text(name));
         item.setItemMeta(meta);
         return item;
+    }
+    private static ItemStack getItem(Material material) {
+        return new ItemStack(material, 1);
+    }
+
+    private static void savePlayerInventory(Player p) {
+        SQLHandler.getInstance().storeInventory(p);
+        p.getInventory().clear();
+        SQLHandler.getInstance().getPlayerGamemode(p.getUniqueId());
+    }
+
+    public static void pushInventoryInnocent(Player p) {
+        p.getInventory().clear();
+        p.setGameMode(GameMode.ADVENTURE);
+    }
+
+    public static void pushInventoryPlayerMurderer(Player p) {
+        p.getInventory().clear();
+        Inventory inv = p.getInventory();
+
+        inv.setItem(1, getItem(Material.STONE_SWORD));
+        p.setGameMode(GameMode.ADVENTURE);
+    }
+
+    public static void pushInventoryPlayerDetective(Player p) {
+        p.getInventory().clear();
+        Inventory inv = p.getInventory();
+
+        inv.setItem(1, getItem(Material.BOW));
+        inv.setItem(2, getItem(Material.ARROW));
+        p.setGameMode(GameMode.ADVENTURE);
     }
 }

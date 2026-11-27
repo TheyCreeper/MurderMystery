@@ -4,6 +4,7 @@ import dev.theycreeper.murdermystery.MurderMystery;
 import dev.theycreeper.murdermystery.game.MurderMysteryZone;
 import dev.theycreeper.murdermystery.model.Pair;
 import org.bukkit.Bukkit;
+import org.bukkit.GameMode;
 import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.entity.Player;
@@ -42,7 +43,8 @@ public class SQLHandler {
             statement.execute("""
                     CREATE TABLE IF NOT EXISTS "player" (
                         "uuid" TEXT NOT NULL PRIMARY KEY,
-                        "realname" TEXT
+                        "realname" TEXT,
+                        "gamemode" TEXT
                     )""");
             statement.execute("""
                     CREATE TABLE IF NOT EXISTS "inventory_item" (
@@ -109,22 +111,23 @@ public class SQLHandler {
             statement.execute("""
                     CREATE INDEX IF NOT EXISTS "idx_items_owner_type"
                     ON "inventory_item" ("uuid")""");
-            addLocationColumnIfMissing(statement, "world", "TEXT");
-            addLocationColumnIfMissing(statement, "yaw", "REAL NOT NULL DEFAULT 0");
-            addLocationColumnIfMissing(statement, "pitch", "REAL NOT NULL DEFAULT 0");
+            addColumnIfMissing(statement, "location", "world", "TEXT");
+            addColumnIfMissing(statement, "location", "yaw", "REAL NOT NULL DEFAULT 0");
+            addColumnIfMissing(statement, "location", "pitch", "REAL NOT NULL DEFAULT 0");
+            addColumnIfMissing(statement, "player", "gamemode", "TEXT");
         } catch (SQLException e) {
             logger.severe("Failed to initialize the database: " + e.getMessage());
             throw new IllegalStateException("Failed to initialize the database", e);
         }
     }
 
-    private void addLocationColumnIfMissing(Statement statement, String name, String definition) throws SQLException {
-        try (ResultSet columns = statement.executeQuery("PRAGMA table_info(location)")) {
+    private void addColumnIfMissing(Statement statement, String table, String name, String definition) throws SQLException {
+        try (ResultSet columns = statement.executeQuery("PRAGMA table_info(" + table + ")")) {
             while (columns.next()) {
                 if (name.equals(columns.getString("name"))) return;
             }
         }
-        statement.execute("ALTER TABLE location ADD COLUMN " + name + " " + definition);
+        statement.execute("ALTER TABLE " + table + " ADD COLUMN " + name + " " + definition);
     }
 
     public List<String> getMurderMysteryZones() {
@@ -341,6 +344,23 @@ public class SQLHandler {
         }
     }
 
+    public GameMode getPlayerGamemode(UUID uuid) {
+        String query = "SELECT gamemode FROM player WHERE uuid = ?";
+        try (PreparedStatement statement = getConnection().prepareStatement(query)) {
+            statement.setString(1, uuid.toString());
+            try (ResultSet resultSet = statement.executeQuery()) {
+                if (resultSet.next()) {
+                    String gamemode = resultSet.getString("gamemode");
+                    if (gamemode != null) return GameMode.valueOf(gamemode);
+                }
+            }
+        } catch (SQLException e) {
+            logger.severe("Failed to retrieve gamemode for " + uuid + ": " + e.getMessage());
+            throw new IllegalStateException("Failed to retrieve gamemode for " + uuid, e);
+        }
+        throw new IllegalStateException("No stored gamemode for " + uuid);
+    }
+
     public Inventory getStoredInventory(UUID uuid) {
         Inventory inventory = Bukkit.createInventory(null, 45);
         String query = "SELECT slot, item_data FROM inventory_item WHERE uuid = ? ORDER BY slot";
@@ -371,13 +391,15 @@ public class SQLHandler {
             try {
                 database.setAutoCommit(false);
                 try (PreparedStatement ensurePlayer = database.prepareStatement(
-                             "INSERT OR IGNORE INTO player (uuid, realname) VALUES (?, ?)");
+                             "INSERT INTO player (uuid, realname, gamemode) VALUES (?, ?, ?) "
+                                     + "ON CONFLICT(uuid) DO UPDATE SET realname = excluded.realname, gamemode = excluded.gamemode");
                      PreparedStatement deleteInventory = database.prepareStatement(
                              "DELETE FROM inventory_item WHERE uuid = ?");
                      PreparedStatement insertItem = database.prepareStatement(
                              "INSERT INTO inventory_item (uuid, slot, material, amount, item_data) VALUES (?, ?, ?, ?, ?)")) {
                     ensurePlayer.setString(1, uuid.toString());
                     ensurePlayer.setString(2, player.getName());
+                    ensurePlayer.setString(3, player.getGameMode().name());
                     ensurePlayer.executeUpdate();
 
                     deleteInventory.setString(1, uuid.toString());

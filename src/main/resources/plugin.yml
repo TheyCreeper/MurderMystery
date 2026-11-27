@@ -13,3 +13,6 @@ commands:
   mmnew:
     permission: murdermystery.commands.mmnew
     description: Create a new murder mystery map
+  party:
+    description: Manage your party
+    usage: /party <invite|accept|decline|kick|leave|list|disband>

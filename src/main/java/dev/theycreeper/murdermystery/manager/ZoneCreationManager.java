@@ -13,7 +13,6 @@ import org.bukkit.event.player.PlayerInteractEvent;
 import java.util.*;
 
 public class ZoneCreationManager {
-    private GameMode previousUserGamemode;
     private MurderMysteryZone zone = new MurderMysteryZone();
     private ArrayList<UUID> edittingPlayers = new ArrayList<>();
     private List<BlockDisplay> blockHighlight;
@@ -171,14 +170,16 @@ public class ZoneCreationManager {
     public void addOffLimitBlock(Location loc) {
         zone.addOffLimits(loc);
     }
+
     public void remOffLimitBlock(Location loc) {
         zone.remOffLimits(loc);
     }
+
     public void setZoneCreationMode(Player player, String mapName) {
         // sets the inventory to set the zone
         zone.setMapName(mapName);
         edittingPlayers.add(player.getUniqueId());
-        previousUserGamemode =  PlayerStateChanger.editingMode(player);
+        PlayerStateChanger.editingMode(player);
         setPlayerMenu(player, CurrentPlayerMenu.mainMenu);
     }
 
@@ -191,7 +192,7 @@ public class ZoneCreationManager {
         }
         unloadMap(zone);
         removeDisplays();
-        PlayerStateChanger.normalMode(p, previousUserGamemode);
+        PlayerStateChanger.normalMode(p, SQLHandler.getInstance().getPlayerGamemode(p.getUniqueId()));
         edittingPlayers.remove(p.getUniqueId());
         playerMode.remove(p.getUniqueId());
         zone = new MurderMysteryZone();
@@ -283,5 +284,9 @@ public class ZoneCreationManager {
     private void clearObstructionHighlights(String mapName) {
         List<BlockDisplay> displays = obstructedDisplays.remove(mapName);
         if (displays != null) displays.forEach(Entity::remove);
+    }
+
+    public MurderMysteryZone getZone() {
+        return zone;
     }
 }

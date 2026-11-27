@@ -14,7 +14,7 @@ public class MMGameManager implements Listener {
     public record MurderMysteryGameSession(MurderMysteryGame game, MurderMysteryZone map) {
     }
 
-    public boolean StartGame(ArrayList<Player> p, Player murd, MurderMysteryZone map) {
+    public boolean StartGame(ArrayList<Player> p, MurderMysteryZone map) {
         if (hasActiveGame()) throw new IllegalStateException("A game is already running");
         ZoneCreationManager zones = MurderMystery.getInstance().getZoneCreationManager();
         if (p.stream().anyMatch(player -> zones.isPlayerEditing(player.getUniqueId()))) {
@@ -23,9 +23,16 @@ public class MMGameManager implements Listener {
         if (!zones.loadMap(map)) return false;
         MurderMysteryGame game = null;
         try {
-            game = new MurderMysteryGame();
+            game = new MurderMysteryGame(map);
             for (Player player : p) game.addPlayer(player);
-            game.setMurderer(murd);
+            // TODO: make this based on percentages like real MM
+            Player murderer = getRandomPlayer(p);
+            p.remove(murderer);
+            Player detective = getRandomPlayer(p);
+            p.remove(detective);
+            game.setMurderer(murderer);
+            game.setDetective(detective);
+            game.setInnocents(p);
             game.StartGame();
             activeGames.add(new MurderMysteryGameSession(game, map));
         } catch (RuntimeException e) {
@@ -42,6 +49,11 @@ public class MMGameManager implements Listener {
             throw e;
         }
         return true;
+    }
+
+    public Player getRandomPlayer(ArrayList<Player> p) {
+        int playerIndex = (int) (Math.random() * p.size());
+        return p.get(playerIndex);
     }
 
     public void StopGame() {

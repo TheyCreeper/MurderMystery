@@ -3,8 +3,11 @@ package dev.theycreeper.murdermystery.saving;
 import dev.theycreeper.murdermystery.game.MurderMysteryZone;
 import dev.theycreeper.murdermystery.model.Pair;
 import org.bukkit.Bukkit;
+import org.bukkit.GameMode;
 import org.bukkit.Location;
 import org.bukkit.World;
+import org.bukkit.entity.Player;
+import org.bukkit.inventory.PlayerInventory;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -31,7 +34,9 @@ class SQLHandlerTest {
         database = DriverManager.getConnection("jdbc:sqlite::memory:");
         try (Statement statement = database.createStatement()) {
             statement.execute("CREATE TABLE location (id INTEGER PRIMARY KEY AUTOINCREMENT, x INTEGER NOT NULL, y INTEGER NOT NULL, z INTEGER NOT NULL)");
+            statement.execute("CREATE TABLE player (uuid TEXT PRIMARY KEY, realname TEXT)");
         }
+
         handler = new SQLHandler(database, Logger.getLogger("test"));
         handler.init();
         handler.init();
@@ -46,6 +51,21 @@ class SQLHandlerTest {
     void tearDown() throws Exception {
         if (bukkit != null) bukkit.close();
         database.close();
+    }
+
+    @Test
+    void storesTheLatestGamemodeForExistingPlayers() {
+        Player player = mock(Player.class);
+        PlayerInventory inventory = mock(PlayerInventory.class);
+        UUID uuid = UUID.randomUUID();
+        when(player.getUniqueId()).thenReturn(uuid);
+        when(player.getName()).thenReturn("player");
+        when(player.getInventory()).thenReturn(inventory);
+        when(player.getGameMode()).thenReturn(GameMode.CREATIVE, GameMode.SURVIVAL);
+        handler.storeInventory(player);
+        assertEquals(GameMode.CREATIVE, handler.getPlayerGamemode(uuid));
+        handler.storeInventory(player);
+        assertEquals(GameMode.SURVIVAL, handler.getPlayerGamemode(uuid));
     }
 
     @Test
