@@ -2,8 +2,9 @@ package dev.theycreeper.murdermystery.manager;
 
 import dev.theycreeper.murdermystery.MurderMystery;
 import dev.theycreeper.murdermystery.game.MurderMysteryGame;
-import dev.theycreeper.murdermystery.game.MMPlayer;
 import dev.theycreeper.murdermystery.game.MurderMysteryZone;
+import dev.theycreeper.murdermystery.game.PlayerType;
+import org.bukkit.ChatColor;
 import org.bukkit.entity.Player;
 import org.junit.jupiter.api.Test;
 import org.mockito.MockedConstruction;
@@ -34,16 +35,29 @@ class MMGameManagerTest {
             MMGameManager manager = new MMGameManager();
             manager.StartGame(new ArrayList<>(List.of(first, second)), map);
             MurderMysteryGame game = games.constructed().getFirst();
-            when(game.getPlayerList()).thenReturn(List.of(new MMPlayer(first), new MMPlayer(second)));
             assertThrows(IllegalStateException.class, () -> manager.innocentsWin(mock(MurderMysteryGame.class)));
             assertTrue(manager.hasActiveGame());
             manager.innocentsWin(game);
-            verify(first).sendTitle(contains("Innocents win!"), anyString(), eq(10), eq(70), eq(20));
-            verify(second).sendTitle(contains("Innocents win!"), anyString(), eq(10), eq(70), eq(20));
+            verify(game).innocentsWin();
             verify(game).EndGame();
             verify(zones).unloadMap(map);
             assertFalse(manager.hasActiveGame());
         }
+    }
+
+    @Test
+    void innocentWinAnnouncesTheOutcomeForEachRole() {
+        MurderMysteryGame game = new MurderMysteryGame(new MurderMysteryZone());
+        Player innocent = mock(Player.class);
+        Player murderer = mock(Player.class);
+        game.addPlayer(innocent);
+        game.addPlayer(murderer);
+        game.getMmPlayer(murderer).setPlayerType(PlayerType.murderer);
+
+        game.innocentsWin();
+
+        verify(innocent).sendTitle(eq(ChatColor.GREEN + "You win!"), anyString(), eq(10), eq(70), eq(20));
+        verify(murderer).sendTitle(eq(ChatColor.RED + "You lost!"), anyString(), eq(10), eq(70), eq(20));
     }
 
     @Test

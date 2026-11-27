@@ -31,6 +31,7 @@ class PlayerKillListenerTest {
         participant(game, murderer, PlayerType.murderer);
         MMPlayer victim = participant(game, target, PlayerType.innocent);
         when(game.isPlayerCanKill(murderer)).thenReturn(true);
+        when(game.isInnocentsLeft()).thenReturn(true);
         EntityEquipment equipment = mock(EntityEquipment.class);
         ItemStack sword = mock(ItemStack.class);
         when(murderer.getEquipment()).thenReturn(equipment);
@@ -48,6 +49,36 @@ class PlayerKillListenerTest {
         assertEquals(PlayerState.dead, victim.getPlayerState());
         verify(game).createCorpse(target);
         verify(event, times(2)).setCancelled(true);
+    }
+
+    @Test
+    void killingTheLastInnocentEndsTheGame() {
+        MurderMysteryGame game = mock(MurderMysteryGame.class);
+        Player murderer = player();
+        Player target = player();
+        participant(game, murderer, PlayerType.murderer);
+        MMPlayer victim = participant(game, target, PlayerType.innocent);
+        when(game.isPlayerCanKill(murderer)).thenReturn(true);
+        when(game.isInnocentsLeft()).thenReturn(false);
+        EntityEquipment equipment = mock(EntityEquipment.class);
+        ItemStack sword = mock(ItemStack.class);
+        when(murderer.getEquipment()).thenReturn(equipment);
+        when(equipment.getItemInMainHand()).thenReturn(sword);
+        when(sword.getType()).thenReturn(Material.STONE_SWORD);
+        EntityDamageByEntityEvent event = mock(EntityDamageByEntityEvent.class);
+        when(event.getDamager()).thenReturn(murderer);
+        when(event.getEntity()).thenReturn(target);
+        MurderMystery plugin = mock(MurderMystery.class);
+        MMGameManager manager = mock(MMGameManager.class);
+        when(plugin.getGameManager()).thenReturn(manager);
+        try (MockedStatic<Bukkit> bukkit = mockStatic(Bukkit.class);
+             MockedStatic<MurderMystery> instance = mockStatic(MurderMystery.class)) {
+            bukkit.when(Bukkit::getOnlinePlayers).thenReturn(List.of());
+            instance.when(MurderMystery::getInstance).thenReturn(plugin);
+            new PlayerKillListener(game).onPlayerHit(event);
+        }
+        assertEquals(PlayerState.dead, victim.getPlayerState());
+        verify(manager).murdererWin(game);
     }
 
     @Test
